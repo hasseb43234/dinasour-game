@@ -56,7 +56,15 @@ function useItem(id) {
 function eatBest() { for (const id of ['cooked', 'berries', 'meat']) if (S.inv[id] > 0) { useItem(id); return; } toast('Nothing to eat'); }
 
 function rebuildPlayer() { if (P.h) scene.remove(P.h.g); P.h = makeHuman(S.look); scene.add(P.h.g); equipWeapon(S.weapon, true); }
-function equipWeapon(w, quiet) { if (!S.tools[w]) w = 'hand'; S.weapon = w; P.h.hand.clear(); P.h.hand.add(makeWeapon(w, S.equip.bow)); if (buildMode && w !== 'hammer') setBuild(false); if (!quiet) sfx('ui'); }
+const fpGroup = new T.Group(), fpHold = new T.Group(); fpGroup.position.set(.34, -.36, -.62); fpGroup.add(fpHold); camera.add(fpGroup); fpGroup.visible = false;
+{ const arm = new T.Mesh(new T.BoxGeometry(.1, .1, .7), new T.MeshStandardMaterial({ color: 0xb5744a, roughness: .8 })); arm.position.set(.07, -.2, .32); arm.rotation.x = .45; fpGroup.add(arm); }
+function fpUpdate() {
+  const on = P.fp && mode === 'play' && !P.mount && P.alive; fpGroup.visible = on; P.h.g.visible = !on; if (!on) return;
+  const bow = S.weapon === 'bow' || S.weapon === 'sling', ch = P.charge >= 0 ? Math.min(1, P.charge / 1.1) : 0;
+  if (bow) { fpHold.rotation.set(Math.PI / 2, 0, .12); fpGroup.position.set(.3 - ch * .1, -.28, -.85 + ch * .12); }
+  else { fpGroup.position.set(.34, -.36, -.62); fpHold.rotation.set(P.swing > 0 ? -1.4 - (1 - P.swing / .3) * 1.5 : -2.04 + ch * .64, 0, -.15); }
+}
+function equipWeapon(w, quiet) { if (!S.tools[w]) w = 'hand'; S.weapon = w; P.h.hand.clear(); P.h.hand.add(makeWeapon(w, S.equip.bow)); fpHold.clear(); fpHold.add(makeWeapon(w, S.equip.bow)); if (buildMode && w !== 'hammer') setBuild(false); if (!quiet) sfx('ui'); }
 function camF3() { const cp = Math.cos(P.camPitch); return new T.Vector3(-Math.sin(P.camYaw) * cp, Math.sin(P.camPitch), -Math.cos(P.camYaw) * cp); }
 const seatH = d => GLB[d.type] ? (d.def.fly ? .22 : d.def.biped ? 1.5 : 1.72) * d.def.s : d.def.fly ? .25 * d.def.s : d.def.biped ? 1.72 * d.def.s : 2.0 * d.def.s;
 
@@ -146,6 +154,7 @@ function releaseCharge() {
   P.charge = -1; P.atkCool = .32; if (perfect) { floatText('PERFECT'); sfx('coin'); }
   const fx = -Math.sin(P.camYaw), fz = -Math.cos(P.camYaw);
   if (w === 'bow' || w === 'sling') {
+    if (P.fp) P.yaw = Math.atan2(fx, fz);
     const ammo = w === 'bow' ? 'arrows' : 'stone'; if (S.inv[ammo] < 1) { toast(w === 'bow' ? 'No arrows — craft some (Tab)' : 'No stones for the sling'); return; }
     S.inv[ammo]--; const start = new T.Vector3(P.pos.x + fx * .6, P.pos.y + 1.45, P.pos.z + fz * .6);
     const dir = camera.position.clone().addScaledVector(camF3(), 110).sub(start).normalize();
@@ -206,6 +215,7 @@ function damage(e, dmg, from, nonlethal) {
   const def = e.def;
   if (e.hp <= 0) { killDino(e, from === P || (from && from.tamed)); return; }
   if (e.tamed || e.state === 'mounted') return;
+  if (e.rider && e.hp < e.maxHp * .55) { e.rider = false; e.m.g.remove(e.riderH.g); e.riderH = null; addAmber(80); toast('Sky rider knocked off — the Pteranodon is dazed, tame it!', 'lime'); }
   if (def.tame && e.hp < e.maxHp * (def.fly ? .55 : .3) && e.state !== 'stunned') { e.state = 'stunned'; e.t = 16; e.air = false; if (from === P) toast(def.name + ' is dazed — get close and feed it to tame!', 'lime'); return; }
   if (e.state === 'stunned') return;
   const attacker = from && from.alive ? from : P;
@@ -234,6 +244,7 @@ function landPoint(cx, cz, rmin, rmax, minH = 1.6, maxH = 30) {
 function buildDinoModel(d) {
   if (d.m) scene.remove(d.m.g);
   d.m = makeDino(d.type, d.pal || (d.tamed && S.equip.mount ? MOUNTSKIN[S.equip.mount] : null)); d.m.g.rotation.order = 'YXZ'; d.m.g.scale.setScalar(d.def.s * (d.scale || 1)); scene.add(d.m.g);
+  if (d.rider) { d.riderH = makeHuman({ build: 'a', body: 'lean', skin: 3, face: 0, hair: 'crop', hairCol: 0, beard: 1, outfit: 'ashfang' }); d.riderH.hand.add(makeWeapon('spear')); const rg = d.riderH.g; rg.scale.setScalar(1 / d.def.s); rg.position.set(0, (GLB[d.type] ? -.1 : -.1) , -.05); d.m.g.add(rg); animHuman(d.riderH, 0, false, { sit: true }); }
   if (d.tamed) { d.tag = makeTag(d.name); d.tag.position.y = (d.def.fly ? 1.2 : d.def.biped ? 2.9 : 2.9) + .3; d.tag.scale.multiplyScalar(1 / d.def.s); d.m.g.add(d.tag); }
 }
 function spawnDino(type, x, z, o = {}) {
@@ -302,6 +313,12 @@ function flyUpdate(d, dt, dp) {
     d.pos.y = Math.max(d.pos.y, gh); d.air = true; d.phase += dt * 7; return;
   }
   if (d.state !== 'wander') d.state = 'wander';
+  if (d.rider && P.alive && mode === 'play' && dp < 80) {
+    d.ang += dt * .5; const tx = P.pos.x + Math.cos(d.ang) * 18, tz = P.pos.z + Math.sin(d.ang) * 18, ty = Math.max(P.pos.y + 7, gh + 5), dx = tx - d.pos.x, dy = ty - d.pos.y, dz = tz - d.pos.z, dd = Math.hypot(dx, dy, dz) || 1, sp = Math.min(dd * 2, 14);
+    d.pos.x += dx / dd * sp * dt; d.pos.y += dy / dd * sp * dt; d.pos.z += dz / dd * sp * dt; d.yaw = lerpAngle(d.yaw, Math.atan2(dx, dz), 3 * dt); d.air = true; d.phase += dt * 7;
+    if (d.cool <= 0 && dp < 45) { d.cool = rand(2.8, 4.4); const st = new T.Vector3(d.pos.x, d.pos.y + .6, d.pos.z), v = 30, tt = Math.hypot(P.pos.x - st.x, P.pos.y - st.y, P.pos.z - st.z) / v; shoot(d, st, new T.Vector3(P.pos.x, P.pos.y + 1 + .5 * 11 * tt * tt, P.pos.z).sub(st).normalize(), v, 8, 'spear'); }
+    return;
+  }
   d.air = true; d.ang += dt * def.spd * .55 / d.rad; d.phase += dt * 6;
   const tx = d.home.x + Math.cos(d.ang) * d.rad, tz = d.home.z + Math.sin(d.ang) * d.rad;
   d.yaw = Math.atan2(tx - d.pos.x, tz - d.pos.z); d.pos.x = lerp(d.pos.x, tx, Math.min(1, dt * 2)); d.pos.z = lerp(d.pos.z, tz, Math.min(1, dt * 2));
@@ -331,7 +348,15 @@ function humanUpdate(e, dt) {
   e.cool -= dt; e.t -= dt; if (e.swing > 0) e.swing -= dt; if (e.alert > 0) e.alert -= dt;
   const dp = dist2(e.pos.x, e.pos.z, P.pos.x, P.pos.z); let speed = 0, tx = 0, tz = 0; if (e.tag) e.tag.visible = dp < 32;
   if (e.team === 'ally') {
-    if (e.emote) { e.et += dt; if (e.et > 2.6) e.emote = null; }
+    if (EV.active === 'gather') { const sx = EV.mark.x + Math.cos(e.home.x * 3) * 6, sz = EV.mark.z + 8 + Math.sin(e.home.z * 3) * 3; if (dist2(e.pos.x, e.pos.z, sx, sz) > 1.5) { tx = sx; tz = sz; speed = 5.5; e.emote = null; } else { e.emote = 'dance'; e.et += dt; e.yaw = Math.atan2(EV.mark.x - e.pos.x, EV.mark.z - e.pos.z); } }
+    else if (P.rally && P.alive) {
+      let tg = null, bd = 16; for (const o of humans) if (o.team === 'ash' && o.alive) { const d = dist2(e.pos.x, e.pos.z, o.pos.x, o.pos.z); if (d < bd) { bd = d; tg = o; } }
+      e.emote = null;
+      if (tg) { tx = tg.pos.x; tz = tg.pos.z; if (bd > 1.9) speed = 6.2; else { e.yaw = Math.atan2(tx - e.pos.x, tz - e.pos.z); if (e.cool <= 0) { e.cool = 1.1; e.swing = .3; damage(tg, 12, e); sfx('hit'); } } }
+      else if (dp > 4 + (e.home.x % 3)) { tx = P.pos.x; tz = P.pos.z; speed = dp > 12 ? 9.5 : 4.5; }
+      if (dp > 110) { const q = landPoint(P.pos.x, P.pos.z, 5, 10, .3); e.pos.x = q.x; e.pos.z = q.z; }
+    }
+    else if (e.emote) { e.et += dt; if (e.et > 2.6) e.emote = null; }
     else if (P.emote && dp < 14) { e.emote = P.emote === 'sit' ? 'wave' : P.emote; e.et = 0; e.yaw = Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z); }
     else { if (e.t <= 0) { e.wp = { x: e.home.x + rand(-7, 7), z: e.home.z + rand(-7, 7) }; e.t = rand(4, 9); e.idle = Math.random() < .5; } if (!e.idle && e.wp && dist2(e.pos.x, e.pos.z, e.wp.x, e.wp.z) > 1) { tx = e.wp.x; tz = e.wp.z; speed = 1.8; } }
   } else {

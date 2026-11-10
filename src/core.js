@@ -21,7 +21,7 @@ const fbm = (x, z) => vnoise(x, z) * .55 + vnoise(x * 2.1, z * 2.1) * .28 + vnoi
 /* ---------- audio (tiny synth) ---------- */
 let AC = null;
 function initAudio() { if (AC) return; try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
-const SFX = { hit: [170, 60, .12, 'square', .14], shoot: [520, 170, .16, 'triangle', .12], pick: [640, 980, .1, 'sine', .1], craft: [420, 860, .22, 'triangle', .12], roar: [150, 42, .9, 'sawtooth', .2], hurt: [230, 90, .22, 'sawtooth', .14], coin: [900, 1500, .18, 'sine', .1], chop: [120, 70, .08, 'square', .16], ui: [700, 720, .05, 'sine', .05], win: [520, 1040, .55, 'triangle', .14], boom: [90, 30, .5, 'sawtooth', .22] };
+const SFX = { hit: [170, 60, .12, 'square', .14], shoot: [520, 170, .16, 'triangle', .12], pick: [640, 980, .1, 'sine', .1], craft: [420, 860, .22, 'triangle', .12], roar: [150, 42, .9, 'sawtooth', .2], hurt: [230, 90, .22, 'sawtooth', .14], coin: [900, 1500, .18, 'sine', .1], chop: [120, 70, .08, 'square', .16], ui: [700, 720, .05, 'sine', .05], win: [520, 1040, .55, 'triangle', .14], boom: [90, 30, .5, 'sawtooth', .22], kick: [130, 42, .2, 'sine', .3], hat: [1800, 1400, .04, 'square', .03] };
 function sfx(kind) {
   if (!AC) return; const p = SFX[kind]; if (!p) return;
   try {
@@ -148,7 +148,7 @@ function buildTerrain() {
   }
   g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals();
   const tm = new T.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
-  if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load('data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(85, 85); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.1); }
+  if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load('data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
   const m = new T.Mesh(g, tm); m.receiveShadow = true; scene.add(m);
   const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x2c8b9e, transparent: true, opacity: .8, roughness: .1, metalness: .4 }));
   w.rotation.x = -Math.PI / 2; w.position.y = 0; scene.add(w);

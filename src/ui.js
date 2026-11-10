@@ -67,10 +67,11 @@ function drawCompass() {
   c.strokeStyle = 'rgba(200,255,46,.22)'; c.lineWidth = 1; c.beginPath(); c.arc(0, 0, 40, 0, 7); c.stroke(); c.beginPath(); c.arc(0, 0, 20, 0, 7); c.stroke();
   const plot = (x, z, lim) => { const dx = x - P.pos.x, dz = z - P.pos.z; let rt = (dx * Math.cos(yaw) - dz * Math.sin(yaw)) * .62, up = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) * .62; const d = Math.hypot(rt, up); if (d > 55) { if (!lim) return null; rt = rt / d * 55; up = up / d * 55; } return [rt, up]; };
   const dot = (p, col, r) => { if (!p) return; c.fillStyle = col; c.beginPath(); c.arc(p[0], p[1], r, 0, 7); c.fill(); };
-  for (const d of dinos) if (d.alive) dot(plot(d.pos.x, d.pos.z), d.tamed ? '#c8ff2e' : d.def.temper === 'hostile' ? '#ff4a3a' : 'rgba(255,255,255,.75)', d.def.big ? 4 : 2.6);
+  for (const d of dinos) if (d.alive) dot(plot(d.pos.x, d.pos.z), d.tamed ? '#c8ff2e' : (d.def.temper === 'hostile' || d.rider) ? '#ff4a3a' : 'rgba(255,255,255,.75)', d.def.big ? 4 : 2.6);
   for (const e of humans) if (e.alive) dot(plot(e.pos.x, e.pos.z), e.team === 'ash' ? '#ff4a3a' : '#8fd0ff', 2.6);
   for (const n of nodes) dot(plot(n.x, n.z, true), '#ffa51f', 3.5);
   for (const f of fires) dot(plot(f.x, f.z), '#ff8a3a', 2);
+  if (EV.active === 'gather' && EV.mark) dot(plot(EV.mark.x, EV.mark.z, true), '#ff5fa8', 5);
   if (!S.won) { const p = plot(OUTPOST.x, OUTPOST.z, true); c.fillStyle = '#ff4a3a'; c.save(); c.translate(p[0], p[1]); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore(); }
   const n = plot(P.pos.x, P.pos.z - 4000, true); c.fillStyle = '#fff'; c.font = '700 12px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('N', n[0] * 1.0, n[1] * 1.0);
   c.fillStyle = '#c8ff2e'; c.beginPath(); c.moveTo(0, -8); c.lineTo(6, 7); c.lineTo(0, 3.5); c.lineTo(-6, 7); c.closePath(); c.fill(); c.restore();
@@ -99,23 +100,24 @@ function wheelClose() {
 }
 
 /* ---------- character creator ---------- */
-const CATS = [['body', 'BODY'], ['skin', 'SKIN'], ['face', 'FACE'], ['hair', 'HAIR'], ['hairCol', 'HAIR COLOR'], ['beard', 'BEARD'], ['outfit', 'OUTFIT']];
+const CATS0 = [['body', 'BODY'], ['skin', 'SKIN'], ['face', 'FACE'], ['hair', 'HAIR'], ['hairCol', 'HAIR COLOR'], ['beard', 'BEARD'], ['outfit', 'OUTFIT']];
 let crCat = 'body';
 function enterCreator() { mode = 'creator'; showHud(false); show('#creator', true); if (document.exitPointerLock) document.exitPointerLock(); crCat = 'body'; creator.spin = 0; $('#crDone').textContent = S.created ? 'DONE' : 'BEGIN SURVIVAL'; renderCreator(); }
 function renderCreator() {
+  const rig = !!RIGS.human, CATS = rig ? [['body', 'BODY'], ['outfit', 'OUTFIT'], ['hair', 'HEADWEAR']] : CATS0;
   creator.zoom = ['skin', 'face', 'hair', 'hairCol', 'beard'].includes(crCat);
   $('#crRail').innerHTML = CATS.map(([k, l], i) => `<button class="${k === crCat ? 'on' : ''}" data-k="${k}"><small>${i + 1}</small>${l}</button>`).join('');
   let opts = [];
   if (crCat === 'body') opts = Object.keys(BODIES).map(k => ({ v: k, l: k }));
   else if (crCat === 'skin') opts = SKINS.map((c, i) => ({ v: i, c }));
   else if (crCat === 'face') opts = ['Round', 'Oval', 'Square', 'Angular'].map((l, i) => ({ v: i, l }));
-  else if (crCat === 'hair') opts = [...HAIRS, ...['sunflare', 'jay'].filter(h => S.owned[h])].map(h => ({ v: h, l: h }));
+  else if (crCat === 'hair') opts = rig ? [{ v: 'crop', l: 'None' }, ...['sunflare', 'jay'].filter(h => S.owned[h]).map(h => ({ v: h, l: SHOP.find(s => s.id === h).name }))] : [...HAIRS, ...['sunflare', 'jay'].filter(h => S.owned[h])].map(h => ({ v: h, l: h }));
   else if (crCat === 'hairCol') opts = HAIRCOL.map((c, i) => ({ v: i, c }));
   else if (crCat === 'beard') opts = [{ v: 0, l: 'None' }, { v: 1, l: 'Full' }];
   else opts = ['hide', ...['ash', 'riot', 'honey', 'frost'].filter(o => S.owned[o])].map(o => ({ v: o, l: o === 'hide' ? 'Hide Wrap' : SHOP.find(s => s.id === o).name, c: OUTFITS[o].c }));
   $('#crTitle').textContent = CATS.find(c => c[0] === crCat)[1];
   $('#crOpts').innerHTML = opts.map((o, i) => `<button class="${S.look[crCat] === o.v ? 'on' : ''}" data-i="${i}">${o.c !== undefined ? `<i style="background:${hex(o.c)}"></i>` : ''}<span>${o.l || ''}</span></button>`).join('');
-  $('#crBuild').innerHTML = ['a', 'b'].map(b => `<button class="${S.look.build === b ? 'on' : ''}" data-b="${b}">FRAME ${b.toUpperCase()}</button>`).join('');
+  $('#crBuild').innerHTML = (rig && !RIGS.human_f ? ['a'] : ['a', 'b']).map(b => `<button class="${S.look.build === b ? 'on' : ''}" data-b="${b}">${rig ? (b === 'a' ? '♂ MALE' : '♀ FEMALE') : 'FRAME ' + b.toUpperCase()}</button>`).join('');
   $('#crRail').querySelectorAll('button').forEach(b => b.onclick = () => { crCat = b.dataset.k; sfx('ui'); renderCreator(); });
   $('#crOpts').querySelectorAll('button').forEach(b => b.onclick = () => { S.look[crCat] = opts[+b.dataset.i].v; rebuildPlayer(); sfx('ui'); renderCreator(); });
   $('#crBuild').querySelectorAll('button').forEach(b => b.onclick = () => { S.look.build = b.dataset.b; rebuildPlayer(); sfx('ui'); renderCreator(); });
@@ -162,7 +164,7 @@ function renderMenu(tab) {
     <h3>MEMBERS</h3><div class="mem"><span><b>You</b> Chieftain</span>${humans.filter(e => e.team === 'ally' && e.alive).map(e => `<span><b>${e.name}</b> Tribemate (AI)</span>`).join('')}${pets.map(d => `<span><b>${d.name}</b> ${d.def.name}</span>`).join('')}</div>
     <h3>RECORD</h3><div class="mem"><span><b>${S.stat.kills}</b> Kills</span><span><b>${S.stat.tames}</b> Tames</span><span><b>${S.pieces.length}</b> Structures</span></div>`;
   } else body = `<h3>CODEX</h3><div class="codex">${Object.keys(DINOS).map(k => { const d = DINOS[k], s = S.codex[k]; return `<div class="${s ? '' : 'unk'}"><b>${s ? d.name : '???'}</b><small>${s ? d.temper.toUpperCase() + (d.mount ? ' · RIDEABLE' : '') : 'Undiscovered'}</small><p>${s ? d.info : 'Get close to one to study it.'}</p></div>`; }).join('')}</div>
-    <h3>CONTROLS</h3><div class="keys">${[['WASD', 'Move'], ['Mouse', 'Look'], ['Shift', 'Sprint'], ['Space', 'Jump / fly up'], ['LMB hold', 'Charge attack'], ['E', 'Interact / tame'], ['F', 'Ride / dismount'], ['Q hold', 'Weapon wheel'], ['1–6', 'Weapons'], ['G hold', 'Emote wheel'], ['Tab', 'Craft'], ['B', 'Build mode'], ['H', 'Eat'], ['P', 'This menu'], ['C', 'Fly down'], ['Arrows', 'Look (no mouse)']].map(k => `<span><kbd>${k[0]}</kbd>${k[1]}</span>`).join('')}</div><button class="btn ghost" id="resetSave">RESET SAVE</button>`;
+    <h3>CONTROLS</h3><div class="keys">${[['WASD', 'Move'], ['Mouse', 'Look'], ['Shift', 'Sprint'], ['Space', 'Jump / fly up'], ['LMB hold', 'Charge attack'], ['E', 'Interact / tame'], ['F', 'Ride / dismount'], ['Q hold', 'Weapon wheel'], ['1–6', 'Weapons'], ['G hold', 'Emote wheel'], ['Tab', 'Craft'], ['B', 'Build mode'], ['H', 'Eat'], ['P', 'This menu'], ['V', 'First / third person'], ['T', 'Rally tribe'], ['C', 'Fly down'], ['Arrows', 'Look (no mouse)']].map(k => `<span><kbd>${k[0]}</kbd>${k[1]}</span>`).join('')}</div><button class="btn ghost" id="resetSave">RESET SAVE</button>`;
   $('#menu').innerHTML = `<nav><div class="brand"><i>◆</i> AMBERFALL</div><div class="tabs">${['shop', 'character', 'tribe', 'codex'].map(t => `<button class="${t === tab ? 'on' : ''}" data-t="${t}">${t.toUpperCase()}</button>`).join('')}</div><div class="amb">◆ ${fmt(S.amber)} AMBER</div><button class="x" id="menuX">PLAY ▸</button></nav><main>${body}</main>`;
   $('#menu').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { sfx('ui'); renderMenu(b.dataset.t); });
   $('#menu').querySelectorAll('.card').forEach(b => b.onclick = () => shopClick(SHOP.find(s => s.id === b.dataset.id)));

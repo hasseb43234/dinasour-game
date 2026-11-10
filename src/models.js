@@ -10,6 +10,7 @@ const OUTFITS = {
   frost: { c: 0xe8eef2, t: 0x9fb6c4, coat: 1 }, riot: { c: 0xd61f7a, t: 0x16161a }, ashfang: { c: 0x6b1f1a, t: 0x2a1a16 }, chief: { c: 0x2a1a16, t: 0xc23b1e, coat: 1 }
 };
 function makeHuman(look) {
+  if (RIGS.human) return makeRigHuman(look);
   const b = BODIES[look.body] || BODIES.athletic, skin = SKINS[look.skin] || SKINS[1], o = OUTFITS[look.outfit] || OUTFITS.hide, hc = HAIRCOL[look.hairCol] || HAIRCOL[0];
   const sw = b.w * (look.build === 'b' ? .88 : 1), f = FACES[look.face] || FACES[0], g = new T.Group(), root = new T.Group(); g.add(root); root.scale.y = b.h;
   const p = [[G.box(.5 * sw, .62, .27 * b.d), o.c, M(0, 1.17, 0)], [G.cyl(.07, .08, .12), skin, M(0, 1.52, 0)],
@@ -53,7 +54,9 @@ function animHuman(h, t, moving, o = {}) {
   else if (e === 'sit') { h.legL.rotation.set(-1.5, 0, .2); h.legR.rotation.set(-1.5, 0, -.2); h.root.position.y = -.72; }
   else if (e === 'flex') { h.armR.rotation.set(0, 0, -1.6); h.armL.rotation.set(0, 0, 1.6); h.root.rotation.y = Math.sin(et * 3) * .3; }
   else if (e === 'stomp') { const s = Math.sin(et * 9); h.legL.rotation.x = s > 0 ? -s * 1.2 : 0; h.legR.rotation.x = s < 0 ? s * 1.2 : 0; h.armR.rotation.set(0, 0, -2.4 - s * .4); h.armL.rotation.set(0, 0, 2.4 - s * .4); h.root.position.y = Math.abs(s) * .1; }
+  if (h.rig) applyRig(h, o);
 }
+
 const BOWSKIN = { glacier: [0x9ad1ff, 0x2f7de0], toxin: [0x54e36a, 0x12602a] };
 function makeWeapon(id, bowSkin) {
   const wood = 0x7a5a36, stone = 0x8d8a83; let m = null, g = new T.Group();

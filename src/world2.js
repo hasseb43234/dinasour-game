@@ -25,6 +25,7 @@ function buildOutpost() {
   const fl = new T.PointLight(0xff8a3a, 14, 30, 1.6); fl.position.set(ox + 4, h + 1.6, oz + 2); scene.add(fl);
   const fm = new T.Mesh(G.cone(.6, 1.6, 6), new T.MeshBasicMaterial({ color: 0xff8a2a })); fm.position.set(ox + 4, h + .9, oz + 2); scene.add(fm);
   if (!S.won) {
+    for (let i = 0; i < 2; i++) spawnDino('ptero', ox, oz, { rider: true, rad: 24 + i * 6, alt: 15 + i * 3, ang: i * 3.1 });
     [[-4, -3], [5, -6], [-7, 4], [6, 6], [-1, 8]].forEach(([dx, dz], i) => spawnHuman({ team: 'ash', out: 1, x: ox + dx, z: oz + dz, name: 'Ashfang ' + ['Hunter', 'Spearman', 'Scout', 'Brute', 'Stalker'][i] }));
     spawnHuman({ team: 'ash', out: 1, chief: 1, x: ox - 1, z: oz - 2, name: 'Chief Varrok' });
   }
@@ -124,6 +125,12 @@ function startEvent(kind) {
   EV.active = kind; EV.t = 0; EV.spawned = 0;
   if (kind === 'storm') { EV.dur = 42; EV.title = 'AMBER STORM'; EV.sub = 'Meteors are falling — grab the amber shards'; }
   else if (kind === 'alpha') { const p = landPoint(P.pos.x, P.pos.z, 60, 85); EV.alpha = spawnDino('rex', p.x, p.z, { alpha: true, scale: 1.18, pal: [0x3a1512, 0x8a2f22, 0xff7a1a], hp: 1300, maxHp: 1300, state: 'chase', target: P, t: 90 }); EV.dur = 260; EV.title = 'ALPHA HUNT'; EV.sub = 'An Alpha Tyrannosaurus is on the prowl'; }
+  else if (kind === 'gather') {
+    const x = SPAWN.x - 9, z = SPAWN.z - 11, y = terrainH(x, z), g = new T.Group(); EV.mark = { x, z }; EV.dur = 75; EV.title = 'TRIBE GATHERING'; EV.sub = 'A show at your camp — get there and dance (hold G) for amber'; EV.day0 = S.dayT; EV.beat = 0; EV.pay = 0;
+    const star = makeDino('rex', MOUNTSKIN.candy); star.g.scale.setScalar(2.2); star.g.position.set(x, y, z); star.g.rotation.order = 'YXZ'; g.add(star.g); const beams = [];
+    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283, bm = new T.Mesh(new T.ConeGeometry(3, 46, 10, 1, true), new T.MeshBasicMaterial({ color: [0xc8ff2e, 0xff5fa8, 0x8a5bff, 0x4ad8ff][i % 4], transparent: true, opacity: .17, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false })); bm.geometry.translate(0, -23, 0); bm.rotation.x = Math.PI; bm.position.set(x + Math.cos(a) * 9, y, z + Math.sin(a) * 9); g.add(bm); beams.push(bm); const fl = new T.Mesh(G.cone(.5, 1.6, 6), new T.MeshBasicMaterial({ color: 0xffa23a })); fl.position.set(x + Math.cos(a) * 9, y + .8, z + Math.sin(a) * 9); g.add(fl); }
+    const lt = new T.PointLight(0xff7ad0, 220, 60, 1.4); lt.position.set(x, y + 9, z + 4); g.add(lt); scene.add(g); EV.fest = { g, star, beams, lt, x, y, z };
+  }
   else { for (let i = 0; i < 3; i++) { const p = landPoint(P.pos.x, P.pos.z, 38, 52, .5); spawnHuman({ team: 'ash', raider: 1, x: p.x, z: p.z, name: 'Ashfang Raider' }); } EV.dur = 200; EV.title = 'TRIBE RAID'; EV.sub = 'Ashfang raiders are hunting you'; }
   sfx('roar'); bigBanner('LIVE EVENT · ' + EV.title, EV.sub);
 }
@@ -133,14 +140,20 @@ function eventsUpdate(dt) {
     if (m.t >= 1) { scene.remove(m.m); meteors.splice(i, 1); sfx('boom'); burst(m.to.x, m.to.y + .5, m.to.z, 0xffa23a, 26, 7, 1.8); if (dist2(P.pos.x, P.pos.z, m.to.x, m.to.z) < 3.5) damage(P, 15, null); const n = new T.Mesh(new T.OctahedronGeometry(.6), new T.MeshBasicMaterial({ color: 0xffa51f })); n.position.set(m.to.x, m.to.y + .8, m.to.z); scene.add(n); nodes.push({ x: m.to.x, z: m.to.z, m: n, amber: 120, life: 240 }); }
   }
   for (let i = nodes.length - 1; i >= 0; i--) { const n = nodes[i]; n.m.rotation.y += dt * 2; n.life -= dt; if (n.life <= 0) { scene.remove(n.m); nodes.splice(i, 1); } }
-  if (!EV.active) { EV.next -= dt; if (EV.next <= 0) { const o = ['storm', 'alpha']; if (!S.won) o.push('raid'); startEvent(EV.first || S.quest < 5 ? 'storm' : pick(o)); EV.first = false; } return; }
+  if (!EV.active) { EV.next -= dt; if (EV.next <= 0) { const o = ['storm', 'alpha', 'gather', 'gather']; if (!S.won) o.push('raid'); startEvent(EV.first ? 'storm' : EV.n === 1 ? 'gather' : pick(o)); EV.first = false; EV.n = (EV.n || 0) + 1; } return; }
   EV.t += dt;
+  if (EV.active === 'gather' && EV.fest) {
+    const f = EV.fest, t = EV.t; S.dayT = .8; f.star.g.position.y = f.y + Math.abs(Math.sin(t * 4.2)) * 1.1; f.star.g.rotation.y = Math.sin(t * 1.4) * 1.2; f.star.g.rotation.z = Math.sin(t * 4.2) * .12; if (f.star.u) { f.star.u.uPh.value = t * 8.4; f.star.u.uAmp.value = .35; }
+    f.beams.forEach((b, i) => { b.rotation.z = Math.sin(t * 1.3 + i) * .45; b.rotation.x = Math.PI + Math.cos(t * 1.1 + i * 2) * .4; }); f.lt.color.setHSL((t * .25) % 1, 1, .6);
+    if ((EV.beat -= dt) <= 0) { EV.beat = .48; sfx('kick'); setTimeout(() => sfx('hat'), 240); burst(f.x + rand(-22, 22), f.y + rand(18, 34), f.z + rand(-22, 22), pick([0xc8ff2e, 0xff5fa8, 0x8a5bff, 0x4ad8ff, 0xffc04a]), 22, 9, 2.4); }
+    if ((EV.pay -= dt) <= 0) { EV.pay = 4; if (dist2(P.pos.x, P.pos.z, f.x, f.z) < 34) { const n = P.emote ? 60 : 25; addAmber(n); toast('+' + n + ' amber · ' + (P.emote ? 'the crowd loves it!' : 'enjoying the show — dance for more'), 'gold'); } }
+  }
   if (EV.active === 'storm' && EV.spawned < 8 && EV.t > EV.spawned * 4 + 2) {
     EV.spawned++; const p = landPoint(P.pos.x, P.pos.z, 12, 42, .8), to = new T.Vector3(p.x, terrainH(p.x, p.z), p.z);
     const m = new T.Mesh(new T.SphereGeometry(.9, 7, 6), new T.MeshBasicMaterial({ color: 0xffc04a })); scene.add(m); meteors.push({ m, to, from: new T.Vector3(p.x + rand(-50, 50), to.y + 140, p.z + rand(-50, 50)), t: 0 });
   }
   let done = EV.t > EV.dur; if (EV.active === 'alpha' && !EV.alpha.alive) done = true; if (EV.active === 'raid' && !humans.some(e => e.raider && e.alive)) { done = true; if (EV.t <= EV.dur) toast('Raid repelled!', 'lime'); }
-  if (done) { EV.active = null; EV.next = rand(170, 260); }
+  if (done) { if (EV.fest) { scene.remove(EV.fest.g); EV.fest = null; S.dayT = EV.day0; toast('The gathering is over — until next time', 'lime'); } EV.active = null; EV.next = rand(170, 260); }
 }
 
 /* ---------- quests ---------- */
@@ -196,6 +209,8 @@ addEventListener('keydown', e => {
     case 'KeyE': case 'KeyF': if (prompt && prompt.key === e.code[3]) prompt.fn(); break;
     case 'KeyB': setBuild(!buildMode); break; case 'KeyH': eatBest(); break;
     case 'KeyR': if (buildMode) buildRot = (buildRot + 1) % 4; break; case 'KeyU': if (buildMode) upgradePiece(); break; case 'KeyX': if (buildMode) removePiece(); break;
+    case 'KeyV': P.fp = !P.fp; toast(P.fp ? 'First-person view' : 'Third-person view'); break;
+    case 'KeyT': P.rally = !P.rally; toast(P.rally ? 'Tribe rallied — they follow and fight with you' : 'Tribe returns to camp', 'lime'); sfx('roar'); break;
     case 'KeyQ': wheelOpen('weapon'); break; case 'KeyG': wheelOpen('emote'); break;
   }
 });
@@ -221,6 +236,7 @@ function updateCamera(dt) {
     camGoal.set(P.pos.x - dv.x * d, P.pos.y + h + (creator.zoom ? 0 : .3), P.pos.z - dv.z * d); camera.position.lerp(camGoal, Math.min(1, 6 * dt));
     camLook.lerp(_v.set(P.pos.x, P.pos.y + h, P.pos.z), Math.min(1, 6 * dt)); camera.lookAt(camLook); P.yaw = Math.atan2(-dv.x, -dv.z) + creator.spin; return;
   }
+  if (P.fp && !P.mount) { const f = camF3(); camera.position.set(P.pos.x + f.x * .12, P.pos.y + 1.64, P.pos.z + f.z * .12); camera.lookAt(camera.position.x + f.x, camera.position.y + f.y, camera.position.z + f.z); return; }
   const m = P.mount, dist = m ? 5.5 + m.def.s * 2.6 : 5.2, f3 = camF3(), rx = Math.cos(P.camYaw), rz = -Math.sin(P.camYaw);
   const tx = P.pos.x + rx * .7, ty = P.pos.y + 1.65, tz = P.pos.z + rz * .7;
   camera.position.set(tx - f3.x * dist, ty - f3.y * dist, tz - f3.z * dist);
@@ -245,7 +261,7 @@ function frame(now) {
     P.h.g.position.copy(P.pos); P.h.g.rotation.y = P.yaw; animHuman(P.h, 0, false, mode === 'creator' ? {} : { sit: !!P.mount }); if (P.mount) P.h.g.position.y -= .78;
     if (mode === 'dead') { for (const d of dinos) dinoUpdate(d, dt); }
   }
-  partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
+  fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
   if (mode === 'play') { uiFrame(); if ((uiAcc += dt) > .1) { uiAcc = 0; uiTick(); } }
 }
 function startPlay() { S.created = true; mode = 'play'; creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }
