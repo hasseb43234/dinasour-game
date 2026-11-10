@@ -4401,7 +4401,7 @@ function rebuildPlayer() { if (P.h) scene.remove(P.h.g); P.h = makeHuman(S.look)
 const fpGroup = new T.Group(), fpHold = new T.Group(); fpGroup.position.set(.34, -.36, -.62); fpGroup.add(fpHold); camera.add(fpGroup); fpGroup.visible = false;
 { const arm = new T.Mesh(new T.BoxGeometry(.1, .1, .7), new T.MeshStandardMaterial({ color: 0xb5744a, roughness: .8 })); arm.position.set(.07, -.2, .32); arm.rotation.x = .45; fpGroup.add(arm); }
 function fpUpdate() {
-  const on = P.fp && mode === 'play' && !P.mount && P.alive; fpGroup.visible = on; P.h.g.visible = !on; if (!on) return;
+  const on = !!(P.fp && mode === 'play' && !P.mount && P.alive); fpGroup.visible = on; P.h.g.visible = !on; if (!on) return;
   const bow = S.weapon === 'bow' || S.weapon === 'sling', ch = P.charge >= 0 ? Math.min(1, P.charge / 1.1) : 0;
   if (bow) { fpHold.rotation.set(Math.PI / 2, 0, .12); fpGroup.position.set(.3 - ch * .1, -.28, -.85 + ch * .12); }
   else { fpGroup.position.set(.34, -.36, -.62); fpHold.rotation.set(P.swing > 0 ? -1.4 - (1 - P.swing / .3) * 1.5 : -2.04 + ch * .64, 0, -.15); }
