@@ -35,7 +35,8 @@ function uiInit() {
   $('#bars').innerHTML = [['hp', '♥'], ['water', '💧'], ['food', '◆']].map(([k, i]) => `<div class="bar ${k}"><i></i><div><b id="b_${k}"></b></div><span id="n_${k}"></span></div>`).join('');
   $('#btnNew').onclick = () => { initAudio(); if (S.created) { try { localStorage.removeItem(SAVE_KEY); sessionStorage.setItem('af-new', '1'); } catch (e) { } S.created = false; location.reload(); } else { show('#title', false); enterCreator(); } };
   $('#btnCont').onclick = () => { initAudio(); show('#title', false); startPlay(); };
-  $('#crDone').onclick = () => { initAudio(); show('#creator', false); startPlay(); };
+  $('#crDone').onclick = () => { initAudio(); S.name = ($('#crName').value || '').replace(/[^\w \-]/g, '').trim().slice(0, 16) || 'Survivor'; show('#creator', false); startPlay(); };
+  $('#crName').addEventListener('keydown', e => e.stopPropagation());
   uiBuildBar();
 }
 function showTitle() { mode = 'title'; show('#title', true); show('#btnCont', !!S.created); $('#btnNew').textContent = S.created ? 'NEW GAME (ERASES SAVE)' : 'NEW GAME'; }
@@ -51,6 +52,7 @@ function uiTick() {
   const dO = dist2(P.pos.x, P.pos.z, OUTPOST.x, OUTPOST.z), so = !S.won && dO < 80; show('#outbar', so);
   if (so) { const left = humans.filter(e => e.out && e.alive).length; $('#outbar').innerHTML = gate.alive ? `<i>◆</i><div><b>RIVAL OUTPOST</b><small>BREACH THE GATE</small></div><em>${Math.round((1 - Math.max(0, S.gate) / gate.max) * 100)}%</em>` : `<i>◆</i><div><b>RIVAL OUTPOST</b><small>DEFEAT THE ASHFANG</small></div><em>${left} LEFT</em>`; }
   const m = P.mount; show('#mountp', !!m); if (m) $('#mountp').innerHTML = `<b>MOUNTED</b><small>${m.def.name.toUpperCase()} · ${m.name}</small><em>${Math.round(m.hp / m.maxHp * 100)}%</em>`;
+  show('#netbar', NET.on); if (NET.on) $('#netbar').textContent = 'ONLINE · ' + (NET.players.size + 1) + ' SURVIVOR' + (NET.players.size ? 'S' : '') + ' · ROOM ' + NET.room.toUpperCase();
   show('#evbar', !!EV.active); if (EV.active) { const r = Math.max(0, EV.dur - EV.t); $('#evbar').innerHTML = `<b>LIVE EVENT</b> ${EV.title} <em>${Math.floor(r / 60)}:${String(Math.floor(r % 60)).padStart(2, '0')}</em>`; }
   show('#resume', !locked);
   if (buildMode) uiBuildBar();
@@ -70,6 +72,7 @@ function drawCompass() {
   for (const d of dinos) if (d.alive) dot(plot(d.pos.x, d.pos.z), d.tamed ? '#c8ff2e' : (d.def.temper === 'hostile' || d.rider) ? '#ff4a3a' : 'rgba(255,255,255,.75)', d.def.big ? 4 : 2.6);
   for (const e of humans) if (e.alive) dot(plot(e.pos.x, e.pos.z), e.team === 'ash' ? '#ff4a3a' : '#8fd0ff', 2.6);
   for (const n of nodes) dot(plot(n.x, n.z, true), '#ffa51f', 3.5);
+  for (const r of NET.players.values()) dot(plot(r.pos.x, r.pos.z, true), '#8fd0ff', 3.4);
   for (const f of fires) dot(plot(f.x, f.z), '#ff8a3a', 2);
   if (EV.active === 'gather' && EV.mark) dot(plot(EV.mark.x, EV.mark.z, true), '#ff5fa8', 5);
   if (!S.won) { const p = plot(OUTPOST.x, OUTPOST.z, true); c.fillStyle = '#ff4a3a'; c.save(); c.translate(p[0], p[1]); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore(); }
@@ -102,7 +105,7 @@ function wheelClose() {
 /* ---------- character creator ---------- */
 const CATS0 = [['body', 'BODY'], ['skin', 'SKIN'], ['face', 'FACE'], ['hair', 'HAIR'], ['hairCol', 'HAIR COLOR'], ['beard', 'BEARD'], ['outfit', 'OUTFIT']];
 let crCat = 'body';
-function enterCreator() { mode = 'creator'; showHud(false); show('#creator', true); if (document.exitPointerLock) document.exitPointerLock(); crCat = 'body'; creator.spin = 0; $('#crDone').textContent = S.created ? 'DONE' : 'BEGIN SURVIVAL'; renderCreator(); }
+function enterCreator() { mode = 'creator'; showHud(false); show('#creator', true); if (document.exitPointerLock) document.exitPointerLock(); crCat = 'body'; creator.spin = 0; $('#crName').value = S.name || ''; $('#crDone').textContent = S.created ? 'DONE' : 'BEGIN SURVIVAL'; renderCreator(); }
 function renderCreator() {
   const rig = !!RIGS.human, CATS = rig ? [['body', 'BODY'], ['outfit', 'OUTFIT'], ['hair', 'HEADWEAR']] : CATS0;
   creator.zoom = ['skin', 'face', 'hair', 'hairCol', 'beard'].includes(crCat);
@@ -161,6 +164,7 @@ function renderMenu(tab) {
     const left = humans.filter(e => e.out && e.alive).length, pets = dinos.filter(d => d.tamed && d.alive);
     body = `<h3>TRIBE RIVALRY</h3><div class="vs"><div class="t me"><b>EMBERHIDE</b><small>Your tribe</small></div><em>VS</em><div class="t foe"><b>ASHFANG</b><small>${S.won ? 'Outpost captured' : gate.alive ? 'Gate standing · ' + Math.round(Math.max(0, S.gate) / gate.max * 100) + '%' : 'Gate breached · ' + left + ' warriors left'}</small></div></div>
     <h3>SEASON 1 · ASHFALL</h3><div class="season"><div><b style="width:${(S.xp % 1500) / 15}%"></b></div><span>Tier ${S.tier} · ${fmt(S.xp % 1500)}/1,500 XP — every tier awards a free Relic Crate. Live events (Amber Storm, Alpha Hunt, Tribe Raid) rotate every few minutes.</span></div>
+    <h3>ONLINE</h3><div class="mem">${NET.on ? `<span><b>${S.name || 'You'}</b> You · room ${NET.room}</span>` + [...NET.players.values()].map(r => `<span><b>${r.name}</b> Survivor</span>`).join('') + '<span>Invite friends: share this page address. Add ?room=yourname for a private room.</span>' : '<span>Offline — open the hosted game link to play with others.</span>'}</div>
     <h3>MEMBERS</h3><div class="mem"><span><b>You</b> Chieftain</span>${humans.filter(e => e.team === 'ally' && e.alive).map(e => `<span><b>${e.name}</b> Tribemate (AI)</span>`).join('')}${pets.map(d => `<span><b>${d.name}</b> ${d.def.name}</span>`).join('')}</div>
     <h3>RECORD</h3><div class="mem"><span><b>${S.stat.kills}</b> Kills</span><span><b>${S.stat.tames}</b> Tames</span><span><b>${S.pieces.length}</b> Structures</span></div>`;
   } else body = `<h3>CODEX</h3><div class="codex">${Object.keys(DINOS).map(k => { const d = DINOS[k], s = S.codex[k]; return `<div class="${s ? '' : 'unk'}"><b>${s ? d.name : '???'}</b><small>${s ? d.temper.toUpperCase() + (d.mount ? ' · RIDEABLE' : '') : 'Undiscovered'}</small><p>${s ? d.info : 'Get close to one to study it.'}</p></div>`; }).join('')}</div>

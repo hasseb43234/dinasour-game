@@ -79,6 +79,8 @@ const sky = new T.Mesh(new T.SphereGeometry(1100, 20, 12), new T.ShaderMaterial(
 }));
 scene.add(sky);
 const sunDisc = new T.Mesh(new T.SphereGeometry(26, 12, 8), new T.MeshBasicMaterial({ color: 0xfff3c4, fog: false })); scene.add(sunDisc);
+{ const gc = document.createElement('canvas'); gc.width = gc.height = 128; const gx = gc.getContext('2d'), gr = gx.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,244,210,.95)'); gr.addColorStop(.25, 'rgba(255,225,160,.35)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); gx.fillStyle = gr; gx.fillRect(0, 0, 128, 128);
+  const glow = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(gc), blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true })); glow.scale.set(16, 16, 1); sunDisc.add(glow); }
 const clouds = new T.Group(); scene.add(clouds);
 {
   const cm = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .82, fog: false }), cg = new T.SphereGeometry(1, 7, 5);
@@ -133,6 +135,8 @@ function makeTag(text, color = '#c8ff2e') {
 }
 
 /* ---------- terrain + water ---------- */
+let waterN = null;
+function waterUpdate(now) { if (waterN) { waterN.offset.x = now * .000012; waterN.offset.y = now * .000019; } }
 function buildTerrain() {
   const N = 180, g = new T.PlaneGeometry(WORLD, WORLD, N, N); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, col = new Float32Array(p.count * 3), c = new T.Color(), c2 = new T.Color();
@@ -150,7 +154,10 @@ function buildTerrain() {
   const tm = new T.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
   if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load('data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
   const m = new T.Mesh(g, tm); m.receiveShadow = true; scene.add(m);
-  const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x2c8b9e, transparent: true, opacity: .8, roughness: .1, metalness: .4 }));
+  const nc = document.createElement('canvas'); nc.width = nc.height = 256; const nx = nc.getContext('2d'), nd = nx.createImageData(256, 256), hf = (x, y) => Math.sin(x * .098) * Math.cos(y * .123) + Math.sin((x + y) * .196) * .5 + Math.sin(x * .294 - y * .245) * .3;
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const dx = hf(x + 1, y) - hf(x - 1, y), dy = hf(x, y + 1) - hf(x, y - 1), i = (y * 256 + x) * 4; nd.data[i] = 128 + dx * 150; nd.data[i + 1] = 128 + dy * 150; nd.data[i + 2] = 255; nd.data[i + 3] = 255; }
+  nx.putImageData(nd, 0, 0); waterN = new T.CanvasTexture(nc); waterN.wrapS = waterN.wrapT = T.RepeatWrapping; waterN.repeat.set(140, 140);
+  const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x1f7f97, transparent: true, opacity: .84, roughness: .08, metalness: .55, normalMap: waterN, normalScale: new T.Vector2(.55, .55) }));
   w.rotation.x = -Math.PI / 2; w.position.y = 0; scene.add(w);
   const lava = new T.Mesh(new T.CircleGeometry(13, 14), new T.MeshBasicMaterial({ color: 0xff6a1a })); lava.rotation.x = -Math.PI / 2;
   lava.position.set(VOLC.x, terrainH(VOLC.x, VOLC.z) + 3, VOLC.z); scene.add(lava);
@@ -194,7 +201,7 @@ function scatter() {
   IM.berry = new T.InstancedMesh(merged([0, 1, 2, 3, 4, 5, 6].map(i => [G.sph(.09, 5, 4), 0xd0304a, M(Math.sin(i * 2.1) * .6, .55 + Math.cos(i * 1.7) * .3, Math.cos(i * 2.1) * .6)])), MAT, bushes.length);
   bushes.forEach((o, i) => { o.i = i; setInst(IM.bush, i, o.x, o.y, o.z, o.s, o.yaw); setInst(IM.berry, i, o.x, o.y, o.z, o.s, o.yaw); }); scene.add(IM.bush, IM.berry);
   // grass tufts
-  const tufts = []; for (let i = 0; i < 12000 && tufts.length < 3200; i++) { const x = (R() - .5) * 560, z = (R() - .5) * 560, h = terrainH(x, z); if (h > 1.8 && h < 26 && dist2(x, z, OUTPOST.x, OUTPOST.z) > 28) tufts.push([x, h, z, .6 + R() * .9, R() * 6]); }
+  const tufts = []; for (let i = 0; i < 30000 && tufts.length < 7000; i++) { const x = (R() - .5) * 560, z = (R() - .5) * 560, h = terrainH(x, z); if (h > 1.8 && h < 26 && dist2(x, z, OUTPOST.x, OUTPOST.z) > 28) tufts.push([x, h, z, .6 + R() * .9, R() * 6]); }
   const gi = new T.InstancedMesh(merged([[G.cone(.1, .6, 3), 0x6fa044, M(0, .3, 0)], [G.cone(.09, .5, 3), 0x5b8f3a, M(.14, .25, .05, 1, 1, 1, 0, 0, -.3)], [G.cone(.09, .45, 3), 0x7fae4e, M(-.12, .22, -.06, 1, 1, 1, 0, 0, .35)]]), MAT, tufts.length);
   tufts.forEach((t, i) => setInst(gi, i, t[0], t[1], t[2], t[3], t[4])); scene.add(gi);
   // fossil site: giant ribcage + skull

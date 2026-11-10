@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Amberfall</title>
+<meta property="og:title" content="Amberfall — online dinosaur survival">
+<meta property="og:description" content="Gather, craft, hunt and tame dinosaurs, build a base, raid a rival tribe and meet other survivors online.">
+<meta property="og:image" content="">
 <style>
 :root{--l:#c8ff2e;--d:#0c120e;--p:rgba(12,18,14,.82);--f:"Bahnschrift","DIN Alternate","Oswald","Arial Narrow",Arial,sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -70,6 +73,10 @@ button{font-family:var(--f);letter-spacing:.06em;cursor:pointer;color:#fff;borde
 #outbar i{color:var(--l);font-style:normal;font-size:16px}#outbar small{display:block;color:var(--l);font-size:10px}#outbar em{font-style:normal;font-weight:700;font-size:15px;margin-left:16px}
 #evbar{background:rgba(255,165,31,.92);color:#1a1205;text-shadow:none;border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700}
 #evbar em{font-style:normal;margin-left:8px}
+#netbar{background:rgba(143,208,255,.92);color:#06121c;text-shadow:none;border-radius:999px;padding:4px 13px;font-size:11px;font-weight:700}
+#crName{background:rgba(12,18,14,.85);border:1px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font:700 14px var(--f);letter-spacing:.06em;padding:9px 16px;text-align:center;width:220px;outline:none}#crName:focus{border-color:var(--l)}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.42) 100%)}
+#gl{filter:contrast(1.07) saturate(1.14)}
 #target{width:240px;text-align:center;font-size:12px;font-weight:700}
 #target div{height:6px;background:rgba(0,0,0,.55);border-radius:3px;margin-top:4px;overflow:hidden}#target b{display:block;height:100%;background:#ff3b4e;transition:width .15s}
 #cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
@@ -150,7 +157,7 @@ h2{font-size:22px}h3{font-size:12px;color:var(--l);margin:14px 0 8px;letter-spac
 <body>
 <div id="hud" class="hide">
   <div id="quest"><small>OBJECTIVE <span id="questN"></span></small><div id="questT"></div></div>
-  <div id="topc"><div id="evbar" class="hide"></div><div id="outbar" class="hide"></div><div id="target" class="hide"><span id="targetN"></span><div><b id="targetB"></b></div></div></div>
+  <div id="topc"><div id="netbar" class="hide"></div><div id="evbar" class="hide"></div><div id="outbar" class="hide"></div><div id="target" class="hide"><span id="targetN"></span><div><b id="targetB"></b></div></div></div>
   <div id="topr"><div id="amber"><i>◆</i><span id="amberN">0</span> AMBER</div><div id="clock"></div></div>
   <div id="toasts"></div>
   <div id="cross"></div>
@@ -165,13 +172,14 @@ h2{font-size:22px}h3{font-size:12px;color:var(--l);margin:14px 0 8px;letter-spac
   <div id="bars"></div>
   <div id="hotbar"></div>
 </div>
+<div id="vig"></div>
 <div id="hurt"></div>
 <div id="banner" class="hide"></div>
 <div id="creator" class="hide">
   <div id="crBuild"></div>
   <div id="crRail"></div>
   <div id="crRight"><div id="crTitle"></div><div id="crOpts"></div></div>
-  <div id="crBottom"><small>Drag to rotate your survivor</small><button class="btn" id="crDone">BEGIN SURVIVAL</button></div>
+  <div id="crBottom"><small>Drag to rotate your survivor</small><input id="crName" maxlength="16" placeholder="Your name" autocomplete="off"><button class="btn" id="crDone">BEGIN SURVIVAL</button></div>
 </div>
 <div id="craft" class="ov hide"></div>
 <div id="menu" class="ov hide"></div>
@@ -3960,6 +3968,8 @@ const sky = new T.Mesh(new T.SphereGeometry(1100, 20, 12), new T.ShaderMaterial(
 }));
 scene.add(sky);
 const sunDisc = new T.Mesh(new T.SphereGeometry(26, 12, 8), new T.MeshBasicMaterial({ color: 0xfff3c4, fog: false })); scene.add(sunDisc);
+{ const gc = document.createElement('canvas'); gc.width = gc.height = 128; const gx = gc.getContext('2d'), gr = gx.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,244,210,.95)'); gr.addColorStop(.25, 'rgba(255,225,160,.35)'); gr.addColorStop(1, 'rgba(255,220,150,0)'); gx.fillStyle = gr; gx.fillRect(0, 0, 128, 128);
+  const glow = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(gc), blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true })); glow.scale.set(16, 16, 1); sunDisc.add(glow); }
 const clouds = new T.Group(); scene.add(clouds);
 {
   const cm = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .82, fog: false }), cg = new T.SphereGeometry(1, 7, 5);
@@ -4014,6 +4024,8 @@ function makeTag(text, color = '#c8ff2e') {
 }
 
 /* ---------- terrain + water ---------- */
+let waterN = null;
+function waterUpdate(now) { if (waterN) { waterN.offset.x = now * .000012; waterN.offset.y = now * .000019; } }
 function buildTerrain() {
   const N = 180, g = new T.PlaneGeometry(WORLD, WORLD, N, N); g.rotateX(-Math.PI / 2);
   const p = g.attributes.position, col = new Float32Array(p.count * 3), c = new T.Color(), c2 = new T.Color();
@@ -4031,7 +4043,10 @@ function buildTerrain() {
   const tm = new T.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
   if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load('data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
   const m = new T.Mesh(g, tm); m.receiveShadow = true; scene.add(m);
-  const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x2c8b9e, transparent: true, opacity: .8, roughness: .1, metalness: .4 }));
+  const nc = document.createElement('canvas'); nc.width = nc.height = 256; const nx = nc.getContext('2d'), nd = nx.createImageData(256, 256), hf = (x, y) => Math.sin(x * .098) * Math.cos(y * .123) + Math.sin((x + y) * .196) * .5 + Math.sin(x * .294 - y * .245) * .3;
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const dx = hf(x + 1, y) - hf(x - 1, y), dy = hf(x, y + 1) - hf(x, y - 1), i = (y * 256 + x) * 4; nd.data[i] = 128 + dx * 150; nd.data[i + 1] = 128 + dy * 150; nd.data[i + 2] = 255; nd.data[i + 3] = 255; }
+  nx.putImageData(nd, 0, 0); waterN = new T.CanvasTexture(nc); waterN.wrapS = waterN.wrapT = T.RepeatWrapping; waterN.repeat.set(140, 140);
+  const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x1f7f97, transparent: true, opacity: .84, roughness: .08, metalness: .55, normalMap: waterN, normalScale: new T.Vector2(.55, .55) }));
   w.rotation.x = -Math.PI / 2; w.position.y = 0; scene.add(w);
   const lava = new T.Mesh(new T.CircleGeometry(13, 14), new T.MeshBasicMaterial({ color: 0xff6a1a })); lava.rotation.x = -Math.PI / 2;
   lava.position.set(VOLC.x, terrainH(VOLC.x, VOLC.z) + 3, VOLC.z); scene.add(lava);
@@ -4075,7 +4090,7 @@ function scatter() {
   IM.berry = new T.InstancedMesh(merged([0, 1, 2, 3, 4, 5, 6].map(i => [G.sph(.09, 5, 4), 0xd0304a, M(Math.sin(i * 2.1) * .6, .55 + Math.cos(i * 1.7) * .3, Math.cos(i * 2.1) * .6)])), MAT, bushes.length);
   bushes.forEach((o, i) => { o.i = i; setInst(IM.bush, i, o.x, o.y, o.z, o.s, o.yaw); setInst(IM.berry, i, o.x, o.y, o.z, o.s, o.yaw); }); scene.add(IM.bush, IM.berry);
   // grass tufts
-  const tufts = []; for (let i = 0; i < 12000 && tufts.length < 3200; i++) { const x = (R() - .5) * 560, z = (R() - .5) * 560, h = terrainH(x, z); if (h > 1.8 && h < 26 && dist2(x, z, OUTPOST.x, OUTPOST.z) > 28) tufts.push([x, h, z, .6 + R() * .9, R() * 6]); }
+  const tufts = []; for (let i = 0; i < 30000 && tufts.length < 7000; i++) { const x = (R() - .5) * 560, z = (R() - .5) * 560, h = terrainH(x, z); if (h > 1.8 && h < 26 && dist2(x, z, OUTPOST.x, OUTPOST.z) > 28) tufts.push([x, h, z, .6 + R() * .9, R() * 6]); }
   const gi = new T.InstancedMesh(merged([[G.cone(.1, .6, 3), 0x6fa044, M(0, .3, 0)], [G.cone(.09, .5, 3), 0x5b8f3a, M(.14, .25, .05, 1, 1, 1, 0, 0, -.3)], [G.cone(.09, .45, 3), 0x7fae4e, M(-.12, .22, -.06, 1, 1, 1, 0, 0, .35)]]), MAT, tufts.length);
   tufts.forEach((t, i) => setInst(gi, i, t[0], t[1], t[2], t[3], t[4])); scene.add(gi);
   // fossil site: giant ribcage + skull
@@ -4869,6 +4884,7 @@ document.addEventListener('pointerlockchange', () => { locked = document.pointer
 addEventListener('blur', () => { for (const k in K) K[k] = false; P.charge = -1; });
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
   if (e.code === 'Tab' || (e.code === 'Space' && mode === 'play')) e.preventDefault(); if (e.repeat) return; K[e.code] = true; initAudio();
   if (mode === 'craft') { if (e.code === 'Tab' || e.code === 'Escape') closeOverlay(); return; }
   if (mode === 'menu') { if (e.code === 'KeyP' || e.code === 'Escape') closeOverlay(); return; }
@@ -4932,10 +4948,10 @@ function frame(now) {
     P.h.g.position.copy(P.pos); P.h.g.rotation.y = P.yaw; animHuman(P.h, 0, false, mode === 'creator' ? {} : { sit: !!P.mount }); if (P.mount) P.h.g.position.y -= .78;
     if (mode === 'dead') { for (const d of dinos) dinoUpdate(d, dt); }
   }
-  fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
+  netUpdate(dt); waterUpdate(now); fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
   if (mode === 'play') { uiFrame(); if ((uiAcc += dt) > .1) { uiAcc = 0; uiTick(); } }
 }
-function startPlay() { S.created = true; mode = 'play'; creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }
+function startPlay() { S.created = true; mode = 'play'; if (NET.started) { if (NET.on) netJoin(); } else netStart(); creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }
 async function boot() {
   await loadAssets(); show('#loading', false);
   let fresh = false; try { fresh = sessionStorage.getItem('af-new') === '1'; sessionStorage.removeItem('af-new'); } catch (e) { }
@@ -4985,7 +5001,8 @@ function uiInit() {
   $('#bars').innerHTML = [['hp', '♥'], ['water', '💧'], ['food', '◆']].map(([k, i]) => `<div class="bar ${k}"><i></i><div><b id="b_${k}"></b></div><span id="n_${k}"></span></div>`).join('');
   $('#btnNew').onclick = () => { initAudio(); if (S.created) { try { localStorage.removeItem(SAVE_KEY); sessionStorage.setItem('af-new', '1'); } catch (e) { } S.created = false; location.reload(); } else { show('#title', false); enterCreator(); } };
   $('#btnCont').onclick = () => { initAudio(); show('#title', false); startPlay(); };
-  $('#crDone').onclick = () => { initAudio(); show('#creator', false); startPlay(); };
+  $('#crDone').onclick = () => { initAudio(); S.name = ($('#crName').value || '').replace(/[^\w \-]/g, '').trim().slice(0, 16) || 'Survivor'; show('#creator', false); startPlay(); };
+  $('#crName').addEventListener('keydown', e => e.stopPropagation());
   uiBuildBar();
 }
 function showTitle() { mode = 'title'; show('#title', true); show('#btnCont', !!S.created); $('#btnNew').textContent = S.created ? 'NEW GAME (ERASES SAVE)' : 'NEW GAME'; }
@@ -5001,6 +5018,7 @@ function uiTick() {
   const dO = dist2(P.pos.x, P.pos.z, OUTPOST.x, OUTPOST.z), so = !S.won && dO < 80; show('#outbar', so);
   if (so) { const left = humans.filter(e => e.out && e.alive).length; $('#outbar').innerHTML = gate.alive ? `<i>◆</i><div><b>RIVAL OUTPOST</b><small>BREACH THE GATE</small></div><em>${Math.round((1 - Math.max(0, S.gate) / gate.max) * 100)}%</em>` : `<i>◆</i><div><b>RIVAL OUTPOST</b><small>DEFEAT THE ASHFANG</small></div><em>${left} LEFT</em>`; }
   const m = P.mount; show('#mountp', !!m); if (m) $('#mountp').innerHTML = `<b>MOUNTED</b><small>${m.def.name.toUpperCase()} · ${m.name}</small><em>${Math.round(m.hp / m.maxHp * 100)}%</em>`;
+  show('#netbar', NET.on); if (NET.on) $('#netbar').textContent = 'ONLINE · ' + (NET.players.size + 1) + ' SURVIVOR' + (NET.players.size ? 'S' : '') + ' · ROOM ' + NET.room.toUpperCase();
   show('#evbar', !!EV.active); if (EV.active) { const r = Math.max(0, EV.dur - EV.t); $('#evbar').innerHTML = `<b>LIVE EVENT</b> ${EV.title} <em>${Math.floor(r / 60)}:${String(Math.floor(r % 60)).padStart(2, '0')}</em>`; }
   show('#resume', !locked);
   if (buildMode) uiBuildBar();
@@ -5020,6 +5038,7 @@ function drawCompass() {
   for (const d of dinos) if (d.alive) dot(plot(d.pos.x, d.pos.z), d.tamed ? '#c8ff2e' : (d.def.temper === 'hostile' || d.rider) ? '#ff4a3a' : 'rgba(255,255,255,.75)', d.def.big ? 4 : 2.6);
   for (const e of humans) if (e.alive) dot(plot(e.pos.x, e.pos.z), e.team === 'ash' ? '#ff4a3a' : '#8fd0ff', 2.6);
   for (const n of nodes) dot(plot(n.x, n.z, true), '#ffa51f', 3.5);
+  for (const r of NET.players.values()) dot(plot(r.pos.x, r.pos.z, true), '#8fd0ff', 3.4);
   for (const f of fires) dot(plot(f.x, f.z), '#ff8a3a', 2);
   if (EV.active === 'gather' && EV.mark) dot(plot(EV.mark.x, EV.mark.z, true), '#ff5fa8', 5);
   if (!S.won) { const p = plot(OUTPOST.x, OUTPOST.z, true); c.fillStyle = '#ff4a3a'; c.save(); c.translate(p[0], p[1]); c.rotate(Math.PI / 4); c.fillRect(-4, -4, 8, 8); c.restore(); }
@@ -5052,7 +5071,7 @@ function wheelClose() {
 /* ---------- character creator ---------- */
 const CATS0 = [['body', 'BODY'], ['skin', 'SKIN'], ['face', 'FACE'], ['hair', 'HAIR'], ['hairCol', 'HAIR COLOR'], ['beard', 'BEARD'], ['outfit', 'OUTFIT']];
 let crCat = 'body';
-function enterCreator() { mode = 'creator'; showHud(false); show('#creator', true); if (document.exitPointerLock) document.exitPointerLock(); crCat = 'body'; creator.spin = 0; $('#crDone').textContent = S.created ? 'DONE' : 'BEGIN SURVIVAL'; renderCreator(); }
+function enterCreator() { mode = 'creator'; showHud(false); show('#creator', true); if (document.exitPointerLock) document.exitPointerLock(); crCat = 'body'; creator.spin = 0; $('#crName').value = S.name || ''; $('#crDone').textContent = S.created ? 'DONE' : 'BEGIN SURVIVAL'; renderCreator(); }
 function renderCreator() {
   const rig = !!RIGS.human, CATS = rig ? [['body', 'BODY'], ['outfit', 'OUTFIT'], ['hair', 'HEADWEAR']] : CATS0;
   creator.zoom = ['skin', 'face', 'hair', 'hairCol', 'beard'].includes(crCat);
@@ -5111,6 +5130,7 @@ function renderMenu(tab) {
     const left = humans.filter(e => e.out && e.alive).length, pets = dinos.filter(d => d.tamed && d.alive);
     body = `<h3>TRIBE RIVALRY</h3><div class="vs"><div class="t me"><b>EMBERHIDE</b><small>Your tribe</small></div><em>VS</em><div class="t foe"><b>ASHFANG</b><small>${S.won ? 'Outpost captured' : gate.alive ? 'Gate standing · ' + Math.round(Math.max(0, S.gate) / gate.max * 100) + '%' : 'Gate breached · ' + left + ' warriors left'}</small></div></div>
     <h3>SEASON 1 · ASHFALL</h3><div class="season"><div><b style="width:${(S.xp % 1500) / 15}%"></b></div><span>Tier ${S.tier} · ${fmt(S.xp % 1500)}/1,500 XP — every tier awards a free Relic Crate. Live events (Amber Storm, Alpha Hunt, Tribe Raid) rotate every few minutes.</span></div>
+    <h3>ONLINE</h3><div class="mem">${NET.on ? `<span><b>${S.name || 'You'}</b> You · room ${NET.room}</span>` + [...NET.players.values()].map(r => `<span><b>${r.name}</b> Survivor</span>`).join('') + '<span>Invite friends: share this page address. Add ?room=yourname for a private room.</span>' : '<span>Offline — open the hosted game link to play with others.</span>'}</div>
     <h3>MEMBERS</h3><div class="mem"><span><b>You</b> Chieftain</span>${humans.filter(e => e.team === 'ally' && e.alive).map(e => `<span><b>${e.name}</b> Tribemate (AI)</span>`).join('')}${pets.map(d => `<span><b>${d.name}</b> ${d.def.name}</span>`).join('')}</div>
     <h3>RECORD</h3><div class="mem"><span><b>${S.stat.kills}</b> Kills</span><span><b>${S.stat.tames}</b> Tames</span><span><b>${S.pieces.length}</b> Structures</span></div>`;
   } else body = `<h3>CODEX</h3><div class="codex">${Object.keys(DINOS).map(k => { const d = DINOS[k], s = S.codex[k]; return `<div class="${s ? '' : 'unk'}"><b>${s ? d.name : '???'}</b><small>${s ? d.temper.toUpperCase() + (d.mount ? ' · RIDEABLE' : '') : 'Undiscovered'}</small><p>${s ? d.info : 'Get close to one to study it.'}</p></div>`; }).join('')}</div>
@@ -5136,7 +5156,74 @@ function openCrate() {
   }, 1500);
 }
 
-window.__af={get S(){return S},P,scene,camera,renderer,gate,EV,GLB,dinos,humans,K,get mode(){return mode},RIGS,fns:{startCharge,releaseCharge,craft,openMenu,openCraft,closeOverlay,setBuild,placePiece,tame,mountDino,startEvent,damage,spawnDino,enterCreator,startPlay,wheelOpen,wheelMove,wheelClose,openCrate}};
+'use strict';
+/* ================= online multiplayer (Higgsfield realtime rooms over WebSocket) ================= */
+const NET = { ws: null, id: null, on: false, tries: 0, players: new Map(), room: 'main', acc: 0, baseSig: '', started: false };
+function netId() { let id = null; try { id = sessionStorage.getItem('af-pid'); if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('af-pid', id); } } catch (e) { } return id || Math.random().toString(36).slice(2, 10); }
+function netSend(m) { if (NET.ws && NET.ws.readyState === 1) try { NET.ws.send(JSON.stringify(m)); } catch (e) { } }
+function netStart() {
+  if (NET.started || !/^https?:$/.test(location.protocol)) return; NET.started = true;
+  NET.room = (new URLSearchParams(location.search).get('room') || 'main').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'main'; NET.id = netId(); netConnect();
+  setInterval(() => { if (NET.ws && NET.ws.readyState === 1) NET.ws.send('__ping'); }, 30000);
+}
+function netJoin() { netSend({ type: 'join', playerId: NET.id, name: S.name || 'Survivor', look: S.look }); NET.baseSig = ''; }
+function netConnect() {
+  let ws; try { ws = new WebSocket((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws/' + NET.room); } catch (e) { return; }
+  NET.ws = ws;
+  ws.onopen = () => { NET.on = true; NET.tries = 0; netJoin(); toast('Online — room "' + NET.room + '"', 'lime'); };
+  ws.onmessage = ev => { if (typeof ev.data !== 'string' || ev.data === '__pong') return; let m; try { m = JSON.parse(ev.data); } catch (e) { return; } netMsg(m); };
+  ws.onclose = ev => { const was = NET.on; NET.on = false; NET.ws = null; for (const id of [...NET.players.keys()]) netRemove(id); if (ev.code === 4000 || (!was && ++NET.tries > 3)) return; setTimeout(netConnect, 1500 * Math.min(NET.tries + 1, 5)); };
+  ws.onerror = () => { };
+}
+function netLook(l) {
+  const o = { ...DEF_LOOK }; if (!l || typeof l !== 'object') return o;
+  if (l.build === 'a' || l.build === 'b') o.build = l.build; if (BODIES[l.body]) o.body = l.body; if (OUTFITS[l.outfit]) o.outfit = l.outfit;
+  if ([...HAIRS, 'sunflare', 'jay'].includes(l.hair)) o.hair = l.hair; for (const k of ['skin', 'face', 'hairCol', 'beard']) if (Number.isInteger(l[k]) && l[k] >= 0 && l[k] < 6) o[k] = l[k]; return o;
+}
+function netAdd(p) {
+  if (!p || p.id === NET.id) return; if (NET.players.has(p.id)) netRemove(p.id);
+  const h = makeHuman(netLook(p.look)), name = String(p.name || 'Survivor').slice(0, 16), tag = makeTag(name, '#8fd0ff'); tag.position.y = 2.25; h.g.add(tag); scene.add(h.g);
+  const r = { id: p.id, name, h, tag, pos: new T.Vector3(SPAWN.x, terrainH(SPAWN.x, SPAWN.z), SPAWN.z), tgt: new T.Vector3(SPAWN.x, terrainH(SPAWN.x, SPAWN.z), SPAWN.z), yaw: 0, tyaw: 0, s: {}, walkT: 0, et: 0, mt: '', mount: null, w: '', seen: false, base: new T.Group() };
+  scene.add(r.base); NET.players.set(p.id, r); if (p.s) netState(r, p.s);
+}
+function netRemove(id) { const r = NET.players.get(id); if (!r) return; scene.remove(r.h.g); scene.remove(r.base); if (r.mount) scene.remove(r.mount.g); NET.players.delete(id); }
+function netState(r, s) {
+  if (!s || !Array.isArray(s.p)) return; r.tgt.set(+s.p[0] || 0, +s.p[1] || 0, +s.p[2] || 0); r.tyaw = +s.p[3] || 0; if (!r.seen) { r.pos.copy(r.tgt); r.yaw = r.tyaw; r.seen = true; }
+  if (s.e !== r.s.e) r.et = 0; r.s = s;
+  const w = WNAME[s.w] ? s.w : 'hand'; if (w !== r.w) { r.w = w; r.h.hand.clear(); r.h.hand.add(makeWeapon(w)); }
+  const mt = DINOS[s.mt] && DINOS[s.mt].mount ? s.mt : ''; if (mt !== r.mt) { if (r.mount) scene.remove(r.mount.g); r.mount = null; r.mt = mt; if (mt) { r.mount = makeDino(mt); r.mount.g.scale.setScalar(DINOS[mt].s); r.mount.g.rotation.order = 'YXZ'; r.mount.ph = 0; scene.add(r.mount.g); } }
+}
+function netBase(r, pieces) {
+  r.base.clear(); if (!Array.isArray(pieces)) return;
+  for (const p of pieces.slice(0, 80)) { if (!p || !PIECES.some(q => q.id === p.id)) continue; const parts = pieceParts(p.id, p.tier ? 1 : 0), g = mesh(parts); g.position.set(p.cx * 4, +p.y || 0, p.cz * 4); g.rotation.y = -(p.rot | 0) * Math.PI / 2; g.receiveShadow = true; r.base.add(g); }
+}
+function netMsg(m) {
+  if (m.type === 'welcome') { for (const p of m.players || []) netAdd(p); if ((m.players || []).length) toast((m.players.length) + ' other survivor' + (m.players.length > 1 ? 's' : '') + ' in this room', 'lime'); }
+  else if (m.type === 'joined') { const known = NET.players.has(m.id); netAdd(m); if (!known) toast((m.name || 'Survivor') + ' joined the island', 'lime'); NET.baseSig = ''; }
+  else if (m.type === 'left') { const r = NET.players.get(m.id); if (r) toast(r.name + ' left'); netRemove(m.id); }
+  else if (m.type === 's') { const r = NET.players.get(m.id); if (r) netState(r, m.s); }
+  else if (m.type === 'b') { const r = NET.players.get(m.id); if (r) netBase(r, m.pieces); }
+  else if (m.type === 'full') toast('This room is full — add ?room=yourname to the address for a private room', 'red');
+}
+function netUpdate(dt) {
+  for (const r of NET.players.values()) {
+    r.pos.lerp(r.tgt, Math.min(1, dt * 10)); r.yaw = lerpAngle(r.yaw, r.tyaw, 10 * dt); const s = r.s, mv = !!s.m, g = r.h.g; g.position.copy(r.pos); g.rotation.y = r.yaw; r.et += dt;
+    r.tag.visible = dist2(r.pos.x, r.pos.z, P.pos.x, P.pos.z) < 80;
+    if (r.mount) {
+      const def = DINOS[r.mt], sh = seatH({ type: r.mt, def }), mg = r.mount.g; mg.position.set(r.pos.x, r.pos.y - sh, r.pos.z); mg.rotation.y = r.yaw; if (mv || def.fly) r.mount.ph += dt * (def.fly ? 7 : 10);
+      if (r.mount.u) { r.mount.u.uPh.value = r.mount.ph; r.mount.u.uAmp.value = def.fly ? 1 : mv ? r.mount.amp : 0; } else if (!def.fly) { const a = mv ? Math.sin(r.mount.ph) * .6 : 0; r.mount.legs.forEach((l, i) => l.rotation.x = (i === 0 || i === 3) ? a : -a); }
+      g.position.y -= .78; animHuman(r.h, 0, false, { sit: true, aim: !!s.c });
+    } else { if (mv) r.walkT += dt * 8.6; const ranged = r.w === 'bow' || r.w === 'sling'; animHuman(r.h, r.walkT, mv, { aim: ranged && !!s.c, raise: !ranged && s.c ? .8 : 0, emote: s.e || null, et: r.et }); }
+  }
+  if (!NET.on || mode !== 'play') return;
+  if ((NET.acc += dt) > .1) {
+    NET.acc = 0; const r2 = v => Math.round(v * 100) / 100;
+    netSend({ type: 's', s: { p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z), r2(P.yaw)], m: (P.moving || (P.mount && P.mount.moving)) ? 1 : 0, e: P.emote || '', w: S.weapon, mt: P.mount ? P.mount.type : '', c: P.charge >= 0 ? 1 : 0 } });
+    const sig = JSON.stringify(S.pieces); if (sig !== NET.baseSig) { NET.baseSig = sig; netSend({ type: 'b', pieces: S.pieces.slice(0, 80) }); }
+  }
+}
+
+window.__af={get S(){return S},P,scene,camera,renderer,gate,EV,GLB,dinos,humans,K,get mode(){return mode},RIGS,NET,fns:{startCharge,releaseCharge,craft,openMenu,openCraft,closeOverlay,setBuild,placePiece,tame,mountDino,startEvent,damage,spawnDino,enterCreator,startPlay,wheelOpen,wheelMove,wheelClose,openCrate}};
 boot();
 })();</script>
 </body>

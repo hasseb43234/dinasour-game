@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Amberfall</title>
+<meta property="og:title" content="Amberfall — online dinosaur survival">
+<meta property="og:description" content="Gather, craft, hunt and tame dinosaurs, build a base, raid a rival tribe and meet other survivors online.">
+<meta property="og:image" content="/*OGIMG*/">
 <style>
 :root{--l:#c8ff2e;--d:#0c120e;--p:rgba(12,18,14,.82);--f:"Bahnschrift","DIN Alternate","Oswald","Arial Narrow",Arial,sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -70,6 +73,10 @@ button{font-family:var(--f);letter-spacing:.06em;cursor:pointer;color:#fff;borde
 #outbar i{color:var(--l);font-style:normal;font-size:16px}#outbar small{display:block;color:var(--l);font-size:10px}#outbar em{font-style:normal;font-weight:700;font-size:15px;margin-left:16px}
 #evbar{background:rgba(255,165,31,.92);color:#1a1205;text-shadow:none;border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700}
 #evbar em{font-style:normal;margin-left:8px}
+#netbar{background:rgba(143,208,255,.92);color:#06121c;text-shadow:none;border-radius:999px;padding:4px 13px;font-size:11px;font-weight:700}
+#crName{background:rgba(12,18,14,.85);border:1px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font:700 14px var(--f);letter-spacing:.06em;padding:9px 16px;text-align:center;width:220px;outline:none}#crName:focus{border-color:var(--l)}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.42) 100%)}
+#gl{filter:contrast(1.07) saturate(1.14)}
 #target{width:240px;text-align:center;font-size:12px;font-weight:700}
 #target div{height:6px;background:rgba(0,0,0,.55);border-radius:3px;margin-top:4px;overflow:hidden}#target b{display:block;height:100%;background:#ff3b4e;transition:width .15s}
 #cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35)}
@@ -150,7 +157,7 @@ h2{font-size:22px}h3{font-size:12px;color:var(--l);margin:14px 0 8px;letter-spac
 <body>
 <div id="hud" class="hide">
   <div id="quest"><small>OBJECTIVE <span id="questN"></span></small><div id="questT"></div></div>
-  <div id="topc"><div id="evbar" class="hide"></div><div id="outbar" class="hide"></div><div id="target" class="hide"><span id="targetN"></span><div><b id="targetB"></b></div></div></div>
+  <div id="topc"><div id="netbar" class="hide"></div><div id="evbar" class="hide"></div><div id="outbar" class="hide"></div><div id="target" class="hide"><span id="targetN"></span><div><b id="targetB"></b></div></div></div>
   <div id="topr"><div id="amber"><i>◆</i><span id="amberN">0</span> AMBER</div><div id="clock"></div></div>
   <div id="toasts"></div>
   <div id="cross"></div>
@@ -165,13 +172,14 @@ h2{font-size:22px}h3{font-size:12px;color:var(--l);margin:14px 0 8px;letter-spac
   <div id="bars"></div>
   <div id="hotbar"></div>
 </div>
+<div id="vig"></div>
 <div id="hurt"></div>
 <div id="banner" class="hide"></div>
 <div id="creator" class="hide">
   <div id="crBuild"></div>
   <div id="crRail"></div>
   <div id="crRight"><div id="crTitle"></div><div id="crOpts"></div></div>
-  <div id="crBottom"><small>Drag to rotate your survivor</small><button class="btn" id="crDone">BEGIN SURVIVAL</button></div>
+  <div id="crBottom"><small>Drag to rotate your survivor</small><input id="crName" maxlength="16" placeholder="Your name" autocomplete="off"><button class="btn" id="crDone">BEGIN SURVIVAL</button></div>
 </div>
 <div id="craft" class="ov hide"></div>
 <div id="menu" class="ov hide"></div>

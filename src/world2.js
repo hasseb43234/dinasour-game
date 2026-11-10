@@ -198,6 +198,7 @@ document.addEventListener('pointerlockchange', () => { locked = document.pointer
 addEventListener('blur', () => { for (const k in K) K[k] = false; P.charge = -1; });
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
   if (e.code === 'Tab' || (e.code === 'Space' && mode === 'play')) e.preventDefault(); if (e.repeat) return; K[e.code] = true; initAudio();
   if (mode === 'craft') { if (e.code === 'Tab' || e.code === 'Escape') closeOverlay(); return; }
   if (mode === 'menu') { if (e.code === 'KeyP' || e.code === 'Escape') closeOverlay(); return; }
@@ -261,10 +262,10 @@ function frame(now) {
     P.h.g.position.copy(P.pos); P.h.g.rotation.y = P.yaw; animHuman(P.h, 0, false, mode === 'creator' ? {} : { sit: !!P.mount }); if (P.mount) P.h.g.position.y -= .78;
     if (mode === 'dead') { for (const d of dinos) dinoUpdate(d, dt); }
   }
-  fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
+  netUpdate(dt); waterUpdate(now); fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
   if (mode === 'play') { uiFrame(); if ((uiAcc += dt) > .1) { uiAcc = 0; uiTick(); } }
 }
-function startPlay() { S.created = true; mode = 'play'; creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }
+function startPlay() { S.created = true; mode = 'play'; if (NET.started) { if (NET.on) netJoin(); } else netStart(); creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }
 async function boot() {
   await loadAssets(); show('#loading', false);
   let fresh = false; try { fresh = sessionStorage.getItem('af-new') === '1'; sessionStorage.removeItem('af-new'); } catch (e) { }
