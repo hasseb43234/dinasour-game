@@ -37,7 +37,7 @@ function netState(r, s) {
 }
 function netBase(r, pieces) {
   r.base.clear(); if (!Array.isArray(pieces)) return;
-  for (const p of pieces.slice(0, 80)) { if (!p || !PIECES.some(q => q.id === p.id)) continue; const parts = pieceParts(p.id, p.tier ? 1 : 0), g = mesh(parts); g.position.set(p.cx * 4, +p.y || 0, p.cz * 4); g.rotation.y = -(p.rot | 0) * Math.PI / 2; g.receiveShadow = true; r.base.add(g); }
+  for (const p of pieces.slice(0, 80)) { if (!p || !PIECES.some(q => q.id === p.id)) continue; const parts = pieceParts(p.id, p.tier ? 1 : 0), g = mesh(parts, p.id === 'bed' || p.id === 'fire' ? MAT : p.tier ? triMat('rockg', .5, 1.7) : triMat('planks', .45, 1.7)); g.position.set(p.cx * 4, +p.y || 0, p.cz * 4); g.rotation.y = -(p.rot | 0) * Math.PI / 2; g.receiveShadow = true; r.base.add(g); }
 }
 function netMsg(m) {
   if (m.type === 'welcome') { for (const p of m.players || []) netAdd(p); if ((m.players || []).length) toast((m.players.length) + ' other survivor' + (m.players.length > 1 ? 's' : '') + ' in this room', 'lime'); }

@@ -5,7 +5,7 @@ let bannerMat = null;
 function refreshSegs() { segs = [...outSegs, ...baseSegs]; }
 function buildOutpost() {
   const { x: ox, z: oz, h, r } = OUTPOST, ga = Math.atan2(SPAWN.z - oz, SPAWN.x - ox), gw = .17, a0 = ga + gw, span = Math.PI * 2 - gw * 2;
-  const n = Math.floor(span * r / 1.0), im = new T.InstancedMesh(merged([[G.cyl(.42, .54, 5.6, 6), 0x6b4a2f, M(0, 2.8, 0)], [G.cone(.42, .9, 6), 0x7d5939, M(0, 6.05, 0)]]), MAT, n + 1);
+  const n = Math.floor(span * r / 1.0), im = new T.InstancedMesh(merged([[G.cyl(.42, .54, 5.6, 8), HAS('bark') ? 0xd8cfc4 : 0x6b4a2f, M(0, 2.8, 0)], [G.cone(.42, .9, 8), HAS('bark') ? 0xe6dccf : 0x7d5939, M(0, 6.05, 0)]]), triMat('bark', .55, 2.6), n + 1);
   for (let i = 0; i <= n; i++) { const a = a0 + span * i / n; setInst(im, i, ox + Math.cos(a) * r, h - .3, oz + Math.sin(a) * r, 1 + hash(i, 3) * .22, a); }
   im.castShadow = true; scene.add(im);
   for (let k = 0; k < 28; k++) { const b0 = a0 + span * k / 28, b1 = a0 + span * (k + 1) / 28; outSegs.push({ x1: ox + Math.cos(b0) * r, z1: oz + Math.sin(b0) * r, x2: ox + Math.cos(b1) * r, z2: oz + Math.sin(b1) * r, y: h, h: 5.6 }); }
@@ -13,7 +13,7 @@ function buildOutpost() {
   if (gate.alive) {
     const gwid = 2 * r * Math.sin(gw) + .6, parts = [[G.box(gwid, 4.8, .45), 0x5a3f27, M(0, 2.4, 0)], [G.box(gwid + .2, .35, .6), 0x2f2a26, M(0, 1.2, 0)], [G.box(gwid + .2, .35, .6), 0x2f2a26, M(0, 3.6, 0)]];
     for (let i = 0; i < 6; i++) parts.push([G.cone(.22, .8, 4), 0xe6dcc0, M(-gwid / 2 + .5 + i * (gwid - 1) / 5, 5.1, 0)]);
-    gate.mesh = mesh(parts); gate.mesh.position.set(gate.x, h, gate.z); gate.mesh.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga)); scene.add(gate.mesh);
+    gate.mesh = mesh(parts, triMat('planks', .45, 1.5)); gate.mesh.position.set(gate.x, h, gate.z); gate.mesh.rotation.y = Math.atan2(-Math.cos(ga), -Math.sin(ga)); scene.add(gate.mesh);
     outSegs.push({ gate: 1, x1: ox + Math.cos(ga - gw) * r, z1: oz + Math.sin(ga - gw) * r, x2: ox + Math.cos(ga + gw) * r, z2: oz + Math.sin(ga + gw) * r, y: h, h: 5 });
   }
   const st = [];
@@ -64,7 +64,7 @@ const pieceGroup = new T.Group(); scene.add(pieceGroup);
 let buildSel = 0, buildRot = 0, ghost = null, ghostSig = '';
 const ghostMat = new T.MeshBasicMaterial({ color: 0xc8ff2e, transparent: true, opacity: .42, depthWrite: false });
 function pieceParts(id, tier) {
-  const c = tier ? 0x97968f : 0x8a6a45, c2 = tier ? 0x6f6e69 : 0x6b5034;
+  const tex = HAS('planks'), c = tier ? (tex ? 0xd4d2cc : 0x97968f) : (tex ? 0xd9c7ad : 0x8a6a45), c2 = tier ? (tex ? 0xa9a7a1 : 0x6f6e69) : (tex ? 0xa8937a : 0x6b5034);
   switch (id) {
     case 'floor': return [[G.box(4, .3, 4), c, M(0, -.15, 0)], [G.box(4.02, .31, .07), c2, M(0, -.15, -1)], [G.box(4.02, .31, .07), c2, M(0, -.15, 1)], [G.box(4.02, .31, .07), c2, M(0, -.15, 0)], ...[[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].map(([x, z]) => [G.box(.3, 3, .3), c2, M(x, -1.7, z)])];
     case 'wall': return [[G.box(4, 3, .25), c, M(0, 1.5, -2)], [G.box(.3, 3.1, .34), c2, M(-1.9, 1.55, -2)], [G.box(.3, 3.1, .34), c2, M(1.9, 1.55, -2)], [G.box(4, .2, .32), c2, M(0, 1.5, -2)]];
@@ -80,7 +80,7 @@ function cellY(cx, cz) {
   const x = cx * 4, z = cz * 4; return Math.max(terrainH(x - 2, z - 2), terrainH(x + 2, z - 2), terrainH(x - 2, z + 2), terrainH(x + 2, z + 2), terrainH(x, z)) + .2;
 }
 function addPiece(p) {
-  const x = p.cx * 4, z = p.cz * 4, th = -p.rot * Math.PI / 2, g = new T.Group(), m = mesh(pieceParts(p.id, p.tier)); m.receiveShadow = true; g.add(m); g.position.set(x, p.y, z); g.rotation.y = th; pieceGroup.add(g);
+  const x = p.cx * 4, z = p.cz * 4, th = -p.rot * Math.PI / 2, g = new T.Group(), m = mesh(pieceParts(p.id, p.tier), p.id === 'bed' || p.id === 'fire' ? MAT : p.tier ? triMat('rockg', .5, 1.7) : triMat('planks', .45, 1.7)); m.receiveShadow = true; g.add(m); g.position.set(x, p.y, z); g.rotation.y = th; pieceGroup.add(g);
   const rp = (lx, lz) => [x + lx * Math.cos(th) + lz * Math.sin(th), z - lx * Math.sin(th) + lz * Math.cos(th)];
   const seg = (a, b) => { const A = rp(a, -2), B = rp(b, -2); baseSegs.push({ x1: A[0], z1: A[1], x2: B[0], z2: B[1], y: p.y, h: 3 }); };
   if (p.id === 'floor') floors.set(cellKey(p.cx, p.cz), p.y);

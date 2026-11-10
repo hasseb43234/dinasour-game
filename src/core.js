@@ -87,7 +87,7 @@ const clouds = new T.Group(); scene.add(clouds);
   for (let i = 0; i < 26; i++) { const c = new T.Group(); for (let j = 0; j < 4; j++) { const m = new T.Mesh(cg, cm); m.position.set(rand(-22, 22), rand(-3, 3), rand(-10, 10)); m.scale.set(rand(14, 26), rand(5, 9), rand(10, 18)); c.add(m); } c.position.set(rand(-700, 700), rand(150, 230), rand(-700, 700)); clouds.add(c); }
 }
 const SKYC = { dTop: new T.Color(0x3f86d6), dBot: new T.Color(0xc3dcec), sBot: new T.Color(0xf5a25d), sTop: new T.Color(0x5a5f9e), nTop: new T.Color(0x0a1228), nBot: new T.Color(0x24324e) };
-let nightF = 0;
+let nightF = 0; const _fogDay = new T.Color(0xc9dcec);
 function updateSky(dayT, focus) {
   const a = dayT * Math.PI * 2, sh = Math.sin(a);
   const day = smooth((sh + .12) / .3), dusk = 1 - smooth(Math.abs(sh) / .38);
@@ -101,7 +101,29 @@ function updateSky(dayT, focus) {
   sun.position.copy(focus).addScaledVector(ld, 140); sun.target.position.copy(focus);
   sun.intensity = lerp(.7, 2.1, day) * (1 - dusk * .35); sun.color.setHex(sh > 0 ? 0xfff1d6 : 0x8fa8ff).lerp(SKYC.sBot, sh > 0 ? dusk * .6 : 0);
   hemi.intensity = lerp(.62, 1.45, day); sky.position.copy(focus);
+  if (skyPano) { skyPano.position.copy(focus); const k = lerp(.07, 1, day); skyPano.material.color.setRGB(k * lerp(1, 1.12, dusk), k * lerp(1, .82, dusk), k * lerp(1.05, .68, dusk)); if (nightF > .5) skyPano.material.color.setRGB(.05, .07, .14); scene.fog.color.copy(SKYC.nBot).lerp(_fogDay, day).lerp(SKYC.sBot, dusk * .6); }
+  if (waterMesh && waterMesh.material.envMap) waterMesh.material.envMapIntensity = lerp(.12, 1.1, day);
   clouds.children.forEach(c => { c.position.x += .012; if (c.position.x > 720) c.position.x = -720; c.children[0].material.opacity = lerp(.18, .82, day); });
+}
+
+/* ---------- generated textures (sky, ground, wood) ---------- */
+const HAS = k => typeof ASSET_IMG !== 'undefined' && !!ASSET_IMG[k];
+function loadTex(k, mirror) { const v = ASSET_IMG[k], tx = new T.TextureLoader().load(v.startsWith('assets/') ? v : 'data:image/jpeg;base64,' + v); tx.colorSpace = T.SRGBColorSpace; tx.wrapS = tx.wrapT = mirror ? T.MirroredRepeatWrapping : T.RepeatWrapping; tx.anisotropy = 8; return tx; }
+let skyPano = null, waterMesh = null;
+if (HAS('sky')) {
+  const tx = loadTex('sky', true); tx.wrapT = T.ClampToEdgeWrapping; tx.repeat.set(2, 1);
+  skyPano = new T.Mesh(new T.SphereGeometry(1050, 48, 16, 0, Math.PI * 2, 0, Math.PI * .5), new T.MeshBasicMaterial({ map: tx, side: T.BackSide, fog: false, depthWrite: false })); scene.add(skyPano); clouds.visible = false;
+}
+const _triMats = {};
+function triMat(k, scale, gain) {
+  if (!HAS(k)) return MAT; if (_triMats[k]) return _triMats[k];
+  const m = new T.MeshStandardMaterial({ vertexColors: true, roughness: .92, metalness: 0 }), tx = loadTex(k, true), S = scale.toFixed(3), K = gain.toFixed(2);
+  m.onBeforeCompile = sh => {
+    sh.uniforms.tTri = { value: tx };
+    sh.vertexShader = 'varying vec3 vTp;varying vec3 vTn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvec4 tw=vec4(transformed,1.0);\n#ifdef USE_INSTANCING\ntw=instanceMatrix*tw;\n#endif\nvTp=(modelMatrix*tw).xyz;vTn=normalize(mat3(modelMatrix)*normal);');
+    sh.fragmentShader = 'uniform sampler2D tTri;varying vec3 vTp;varying vec3 vTn;\n' + sh.fragmentShader.replace('#include <map_fragment>', 'vec3 tb=abs(vTn);tb/=(tb.x+tb.y+tb.z+1e-4);vec3 tc=texture2D(tTri,vTp.zy*' + S + ').rgb*tb.x+texture2D(tTri,vTp.xz*' + S + ').rgb*tb.y+texture2D(tTri,vTp.xy*' + S + ').rgb*tb.z;diffuseColor.rgb*=tc*' + K + ';');
+  };
+  m.customProgramCacheKey = () => 'tri' + k; _triMats[k] = m; return m;
 }
 
 /* ---------- geometry helpers ---------- */
@@ -139,7 +161,7 @@ let waterN = null;
 function waterUpdate(now) { if (waterN) { waterN.offset.x = now * .000012; waterN.offset.y = now * .000019; } }
 function buildTerrain() {
   const N = 180, g = new T.PlaneGeometry(WORLD, WORLD, N, N); g.rotateX(-Math.PI / 2);
-  const p = g.attributes.position, col = new Float32Array(p.count * 3), c = new T.Color(), c2 = new T.Color();
+  const p = g.attributes.position, col = new Float32Array(p.count * 3), c = new T.Color(), c2 = new T.Color(), splat = HAS('grass') && HAS('sand') && HAS('rockg') ? new Float32Array(p.count * 3) : null;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), z = p.getZ(i), h = terrainH(x, z); p.setY(i, h);
     const sl = Math.hypot(terrainH(x + 2, z) - h, terrainH(x, z + 2) - h) / 2, n = vnoise(x * .05, z * .05);
@@ -148,17 +170,32 @@ function buildTerrain() {
     const dv = dist2(x, z, VOLC.x, VOLC.z); if (dv < 95) c.lerp(c2.set(0x3b3532), smooth((95 - dv) / 50)); if (dv < 14) c.set(0xa3300f);
     const dO = dist2(x, z, OUTPOST.x, OUTPOST.z); if (dO < 30) c.lerp(c2.set(0x9b7c55), smooth((30 - dO) / 8));
     const dS = dist2(x, z, SPAWN.x, SPAWN.z); if (dS < 9 && h > .7) c.lerp(c2.set(0xa58a60), smooth((9 - dS) / 5) * .8);
+    if (splat) {
+      let ws = h < .7 ? 1 : h < 1.9 ? 1 - (h - .7) / 1.2 : 0, wr = clamp((sl - .5) * 3, 0, 1), tint = .86 + n * .12; c.setRGB(tint, tint, tint * .96);
+      if (dv < 95) { const k = smooth((95 - dv) / 50); wr = Math.max(wr, k); c.lerp(c2.set(0x5a504c), k * .8); } if (dv < 14) c.set(0xff5a1e);
+      if (dO < 30) { const k = smooth((30 - dO) / 8); ws = Math.max(ws, k * .85); c.lerp(c2.set(0xb08e68), k * .7); }
+      if (dS < 9 && h > .7) { const k = smooth((9 - dS) / 5) * .8; ws = Math.max(ws, k * .8); c.lerp(c2.set(0xb39672), k * .6); }
+      ws = Math.min(ws, 1 - wr); splat[i * 3] = Math.max(0, 1 - ws - wr); splat[i * 3 + 1] = ws; splat[i * 3 + 2] = wr;
+    }
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
   g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals();
   const tm = new T.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
-  if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load(ASSET_IMG.ground.startsWith('assets/') ? ASSET_IMG.ground : 'data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
+  if (splat) {
+    g.setAttribute('splat', new T.BufferAttribute(splat, 3)); const tg = loadTex('grass', true), ts = loadTex('sand', true), tr = loadTex('rockg', true);
+    tm.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, { tGrass: { value: tg }, tSand: { value: ts }, tRock: { value: tr } });
+      sh.vertexShader = 'attribute vec3 splat;varying vec3 vSplat;varying vec2 vWxz;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat=splat;vWxz=position.xz;');
+      sh.fragmentShader = 'uniform sampler2D tGrass;uniform sampler2D tSand;uniform sampler2D tRock;varying vec3 vSplat;varying vec2 vWxz;\n' + sh.fragmentShader.replace('#include <map_fragment>', 'vec2 tu=vWxz*0.17;vec3 cg=mix(texture2D(tGrass,tu).rgb,texture2D(tGrass,tu*0.13).rgb,0.6);vec3 cs=mix(texture2D(tSand,tu*0.6).rgb,texture2D(tSand,tu*0.13).rgb,0.35);vec3 cr=mix(texture2D(tRock,tu*0.45).rgb,texture2D(tRock,tu*0.11).rgb,0.4);diffuseColor.rgb*=(cg*vSplat.x*1.12+cs*vSplat.y*1.1+cr*vSplat.z*1.5);');
+    };
+  }
   const m = new T.Mesh(g, tm); m.receiveShadow = true; scene.add(m);
   const nc = document.createElement('canvas'); nc.width = nc.height = 256; const nx = nc.getContext('2d'), nd = nx.createImageData(256, 256), hf = (x, y) => Math.sin(x * .098) * Math.cos(y * .123) + Math.sin((x + y) * .196) * .5 + Math.sin(x * .294 - y * .245) * .3;
   for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const dx = hf(x + 1, y) - hf(x - 1, y), dy = hf(x, y + 1) - hf(x, y - 1), i = (y * 256 + x) * 4; nd.data[i] = 128 + dx * 150; nd.data[i + 1] = 128 + dy * 150; nd.data[i + 2] = 255; nd.data[i + 3] = 255; }
   nx.putImageData(nd, 0, 0); waterN = new T.CanvasTexture(nc); waterN.wrapS = waterN.wrapT = T.RepeatWrapping; waterN.repeat.set(140, 140);
   const w = new T.Mesh(new T.PlaneGeometry(2600, 2600), new T.MeshStandardMaterial({ color: 0x1f7f97, transparent: true, opacity: .84, roughness: .08, metalness: .55, normalMap: waterN, normalScale: new T.Vector2(.55, .55) }));
-  w.rotation.x = -Math.PI / 2; w.position.y = 0; scene.add(w);
+  w.rotation.x = -Math.PI / 2; w.position.y = 0; scene.add(w); waterMesh = w;
+  if (HAS('sky')) { const ev = loadTex('sky', false); ev.mapping = T.EquirectangularReflectionMapping; w.material.envMap = ev; w.material.color.setHex(0x2a7f96); w.material.metalness = .7; }
   const lava = new T.Mesh(new T.CircleGeometry(13, 14), new T.MeshBasicMaterial({ color: 0xff6a1a })); lava.rotation.x = -Math.PI / 2;
   lava.position.set(VOLC.x, terrainH(VOLC.x, VOLC.z) + 3, VOLC.z); scene.add(lava);
 }
@@ -202,7 +239,7 @@ function scatter() {
   bushes.forEach((o, i) => { o.i = i; setInst(IM.bush, i, o.x, o.y, o.z, o.s, o.yaw); setInst(IM.berry, i, o.x, o.y, o.z, o.s, o.yaw); }); scene.add(IM.bush, IM.berry);
   // grass tufts
   const tufts = []; for (let i = 0; i < 30000 && tufts.length < 7000; i++) { const x = (R() - .5) * 560, z = (R() - .5) * 560, h = terrainH(x, z); if (h > 1.8 && h < 26 && dist2(x, z, OUTPOST.x, OUTPOST.z) > 28) tufts.push([x, h, z, .6 + R() * .9, R() * 6]); }
-  const gi = new T.InstancedMesh(merged([[G.cone(.1, .6, 3), 0x6fa044, M(0, .3, 0)], [G.cone(.09, .5, 3), 0x5b8f3a, M(.14, .25, .05, 1, 1, 1, 0, 0, -.3)], [G.cone(.09, .45, 3), 0x7fae4e, M(-.12, .22, -.06, 1, 1, 1, 0, 0, .35)]]), MAT, tufts.length);
+  const gi = new T.InstancedMesh(merged([[G.cone(.07, .6, 3), 0x4f7a30, M(0, .3, 0)], [G.cone(.06, .5, 3), 0x456d2b, M(.14, .25, .05, 1, 1, 1, 0, 0, -.3)], [G.cone(.06, .45, 3), 0x5d8a38, M(-.12, .22, -.06, 1, 1, 1, 0, 0, .35)]]), MAT, tufts.length);
   tufts.forEach((t, i) => setInst(gi, i, t[0], t[1], t[2], t[3], t[4])); scene.add(gi);
   // fossil site: giant ribcage + skull
   const bone = 0xe6dcc0, fy = terrainH(FOSSIL.x, FOSSIL.z), fp = [];
