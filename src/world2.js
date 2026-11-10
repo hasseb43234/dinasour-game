@@ -249,7 +249,7 @@ function updateCamera(dt) {
 let lastT = performance.now(), uiAcc = 0, saveAcc = 0, qAcc = 0, perfN = 0, perfT = 0, perfDone = false, perfRaw = 0;
 function frame(now) {
   requestAnimationFrame(frame); const raw = (now - lastT) / 1000, dt = Math.min(.05, raw); lastT = now; if (mode === 'play' && !perfDone) perfRaw += raw;
-  if (mode === 'play' && !perfDone) { perfN++; perfT += (now - lastT + dt * 1000) * 0 + dt; if (perfN >= 150) { perfDone = true; if (perfN / perfRaw < 26) { renderer.shadowMap.enabled = false; sun.castShadow = false; renderer.setPixelRatio(1); scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); toast('Low frame rate — shadows turned off'); } } }
+  if (mode === 'play' && !perfDone) { perfN++; perfT += (now - lastT + dt * 1000) * 0 + dt; if (perfN >= 150) { perfDone = true; if (perfN / perfRaw < 26) { renderer.shadowMap.enabled = false; sun.castShadow = false; renderer.setPixelRatio(1); usePost = false; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); toast('Low frame rate — shadows and glow turned off'); } } }
   if (mode === 'play') {
     S.dayT = (S.dayT + dt / 600) % 1; if (S.fossilT > 0) S.fossilT -= dt; if (lastHitT > 0) lastHitT -= dt;
     playerUpdate(dt); for (const d of dinos) dinoUpdate(d, dt); for (const e of humans) humanUpdate(e, dt);
@@ -262,7 +262,7 @@ function frame(now) {
     P.h.g.position.copy(P.pos); P.h.g.rotation.y = P.yaw; animHuman(P.h, 0, false, mode === 'creator' ? {} : { sit: !!P.mount }); if (P.mount) P.h.g.position.y -= .78;
     if (mode === 'dead') { for (const d of dinos) dinoUpdate(d, dt); }
   }
-  netUpdate(dt); waterUpdate(now); fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderer.render(scene, camera);
+  netUpdate(dt); waterUpdate(now); fpUpdate(); partsUpdate(dt); updateCamera(dt); updateSky(S.dayT, P.pos); renderFrame();
   if (mode === 'play') { uiFrame(); if ((uiAcc += dt) > .1) { uiAcc = 0; uiTick(); } }
 }
 function startPlay() { S.created = true; mode = 'play'; if (NET.started) { if (NET.on) netJoin(); } else netStart(); creator.zoom = false; creator.spin = 0; showHud(true); requestLock(); save(); }

@@ -64,10 +64,18 @@ const camera = new T.PerspectiveCamera(62, 1, .1, 1400);
 scene.add(camera);
 const hemi = new T.HemisphereLight(0xcfe6ff, 0x7a7258, 1.0); scene.add(hemi);
 const sun = new T.DirectionalLight(0xfff1d6, 2.4); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -.0006; sun.shadow.normalBias = .06;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.radius = 2.5; sun.shadow.bias = -.0006; sun.shadow.normalBias = .06;
 Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, near: 1, far: 320 });
 scene.add(sun); scene.add(sun.target);
-function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+let composer = null, usePost = true;
+if (T.EffectComposer) {
+  try {
+    const rt = new T.WebGLRenderTarget(innerWidth, innerHeight, { samples: 4, type: T.HalfFloatType }); composer = new T.EffectComposer(renderer, rt); composer.setPixelRatio(renderer.getPixelRatio());
+    composer.addPass(new T.RenderPass(scene, camera)); composer.addPass(new T.UnrealBloomPass(new T.Vector2(innerWidth, innerHeight), .3, .75, .88)); composer.addPass(new T.OutputPass());
+  } catch (e) { composer = null; }
+}
+function renderFrame() { if (composer && usePost) composer.render(); else renderer.render(scene, camera); }
+function resize() { renderer.setSize(innerWidth, innerHeight); if (composer) composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
 /* sky dome */
