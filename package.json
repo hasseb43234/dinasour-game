@@ -1,0 +1,6 @@
+{
+  "name": "amberfall",
+  "private": true,
+  "scripts": { "build": "node build.js" },
+  "dependencies": { "three": "0.160.0" }
+}
