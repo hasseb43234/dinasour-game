@@ -11,3 +11,11 @@ const cover = fs.existsSync(path.join(adir, 'cover-url.txt')) ? fs.readFileSync(
 const html = src('template.html').replace('/*OGIMG*/', () => cover).replace('/*THREE*/', () => esc(fs.readFileSync(path.join(__dirname, 'vendor/three-bundle.js'), 'utf8'))).replace('/*GAME*/', () => esc(wrapped));
 fs.writeFileSync(path.join(__dirname, 'index.html'), html);
 console.log('index.html', (html.length / 1048576).toFixed(2) + ' MB', Object.keys(assets).join(','));
+
+// Hosted build: small page + separate script and model files (for hosts that cap single-file size)
+const site = path.join(__dirname, 'site'); fs.rmSync(site, { recursive: true, force: true }); fs.mkdirSync(path.join(site, 'assets'), { recursive: true });
+for (const f of fs.readdirSync(adir)) if (f.endsWith('.glb') || f.endsWith('.jpg')) fs.copyFileSync(path.join(adir, f), path.join(site, 'assets', f));
+fs.copyFileSync(path.join(__dirname, 'vendor/three-bundle.js'), path.join(site, 'three-bundle.js'));
+fs.writeFileSync(path.join(site, 'game.js'), wrapped.replace(/const ASSET_DATA=.*?;const ASSET_IMG=.*?;\n/s, () => `const ASSET_LIST=${JSON.stringify(Object.keys(assets))};const ASSET_IMG=${JSON.stringify(Object.fromEntries(Object.keys(imgs).map(k => [k, 'assets/' + k + '.jpg'])))};\n`));
+fs.writeFileSync(path.join(site, 'index.html'), src('template.html').replace('/*OGIMG*/', () => cover).replace('<script>/*THREE*/</script>', '<script src="three-bundle.js"></script>').replace('<script>/*GAME*/</script>', '<script src="game.js"></script>'));
+console.log('site/', fs.readdirSync(site).join(','), (fs.statSync(path.join(site, 'game.js')).size / 1024).toFixed(0) + ' KB game.js');

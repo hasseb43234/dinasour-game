@@ -14,11 +14,12 @@ const WOBBLE = [
   'float w=abs(position.x);transformed.y+=sin(uPh)*uAmp*w*w*.16;'
 ];
 async function loadAssets() {
-  if (typeof ASSET_DATA === 'undefined') return; const L = new T.GLTFLoader();
-  for (const name in ASSET_DATA) {
+  const L = new T.GLTFLoader(), inline = typeof ASSET_DATA !== 'undefined', names = inline ? Object.keys(ASSET_DATA) : (typeof ASSET_LIST !== 'undefined' ? ASSET_LIST : []);
+  const bufs = await Promise.all(names.map(async name => { try { if (inline) { const bin = atob(ASSET_DATA[name]), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i); return buf.buffer; } const r = await fetch('assets/' + name + '.glb'); return r.ok ? await r.arrayBuffer() : null; } catch (e) { return null; } }));
+  for (let ni = 0; ni < names.length; ni++) {
+    const name = names[ni], ab = bufs[ni]; if (!ab) { console.warn('asset missing', name); continue; }
     try {
-      const bin = atob(ASSET_DATA[name]), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      const g = await new Promise((ok, no) => L.parse(buf.buffer, '', ok, no)); let m = null;
+      const g = await new Promise((ok, no) => L.parse(ab, '', ok, no)); let m = null;
       if (name.startsWith('human')) { g.scene.traverse(o => { if (o.isSkinnedMesh) { const mt = new T.MeshStandardMaterial({ map: o.material.map, roughness: .85, metalness: 0 }); mt.color.setScalar(1.75); o.material = mt; } }); RIGS[name] = { scene: g.scene }; continue; } g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if (o.isMesh && !m) m = o; });
       const cfg = ASSET_CFG[name] || { dim: 'y', size: 1 }, geo = m.geometry.clone(); geo.applyMatrix4(m.matrixWorld); if (cfg.yaw) geo.rotateY(cfg.yaw);
       geo.computeBoundingBox(); const b = geo.boundingBox, sz = b.getSize(new T.Vector3()), c = b.getCenter(new T.Vector3()), k = cfg.size / sz[cfg.dim];

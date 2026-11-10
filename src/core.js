@@ -152,7 +152,7 @@ function buildTerrain() {
   }
   g.setAttribute('color', new T.BufferAttribute(col, 3)); g.computeVertexNormals();
   const tm = new T.MeshStandardMaterial({ vertexColors: true, roughness: .96 });
-  if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load('data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
+  if (typeof ASSET_IMG !== 'undefined' && ASSET_IMG.ground) { const tx = new T.TextureLoader().load(ASSET_IMG.ground.startsWith('assets/') ? ASSET_IMG.ground : 'data:image/jpeg;base64,' + ASSET_IMG.ground); tx.wrapS = tx.wrapT = T.MirroredRepeatWrapping; tx.repeat.set(70, 70); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 8; tm.map = tx; tm.color.setScalar(2.0); }
   const m = new T.Mesh(g, tm); m.receiveShadow = true; scene.add(m);
   const nc = document.createElement('canvas'); nc.width = nc.height = 256; const nx = nc.getContext('2d'), nd = nx.createImageData(256, 256), hf = (x, y) => Math.sin(x * .098) * Math.cos(y * .123) + Math.sin((x + y) * .196) * .5 + Math.sin(x * .294 - y * .245) * .3;
   for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) { const dx = hf(x + 1, y) - hf(x - 1, y), dy = hf(x, y + 1) - hf(x, y - 1), i = (y * 256 + x) * 4; nd.data[i] = 128 + dx * 150; nd.data[i + 1] = 128 + dy * 150; nd.data[i + 2] = 255; nd.data[i + 3] = 255; }
